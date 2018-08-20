@@ -104,7 +104,6 @@ bool CEC_LogicalDevice::ProcessStateMachine(bool* success)
 
 void CEC_LogicalDevice::OnReceiveComplete(unsigned char* buffer, int count)
 {
-	ASSERT(count >= 1);
 	int sourceAddress = (buffer[0] >> 4) & 0x0f;
 	int targetAddress = buffer[0] & 0x0f;
 	OnReceive(sourceAddress, targetAddress, buffer + 1, count - 1);
