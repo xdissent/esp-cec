@@ -1,19 +1,43 @@
 #include "CEC_Device.h"
 
-#define IN_LINE 2
-#define OUT_LINE 3
+// NodeMCU ESP8266 Pins   bootstrap
+// D0  GPIO16  DeepSleep  blue LED connected to 3V3
+// D1  GPIO5
+// D2  GPIO4
+// D3  GPIO0              pull-up (SPI boot) / pull-down (UART boot)
+// D4  GPIO2   TxD1       pull-up, blue LED on ESP12E module
+// D5  GPIO14
+// D6  GPIO12
+// D7  GPIO13
+// D8  GPIO15             pull-down
+// D9  GPIO3   RxD0
+// D10 GPIO1   TxD0
+// CLK GPIO6   SD_CLK
+// SD0 GPIO7   SD_D0
+// SD1 GPIO8   SD_D1
+// SD2 GPIO9   SD_D2
+// SD3 GPIO10  SD_D3
+// CMD GPIO11  SD_CMD
+
+#define CEC_GPIO 5
 
 CEC_Device device(0x1000);
 
 bool XX_GetLineState()
 {
-  int state = digitalRead(IN_LINE);
-  return state == LOW;
+  int state = digitalRead(CEC_GPIO);
+  return state != LOW;
 }
 
 void XX_SetLineState(CEC_Device* device, bool state)
 {
-  digitalWrite(OUT_LINE, state?LOW:HIGH);
+  if (state)
+  {
+    pinMode(CEC_GPIO, INPUT_PULLUP);
+  } else {
+    digitalWrite(CEC_GPIO, LOW);
+    pinMode(CEC_GPIO, OUTPUT);
+  }
   // give enough time for the line to settle before sampling
   // it
   delayMicroseconds(50);
@@ -22,11 +46,7 @@ void XX_SetLineState(CEC_Device* device, bool state)
 
 void setup()
 {
-  pinMode(OUT_LINE, OUTPUT);
-  pinMode(IN_LINE, INPUT);
-
-  digitalWrite(OUT_LINE, LOW);
-  delay(200);
+  pinMode(CEC_GPIO, INPUT_PULLUP);
 
   Serial.begin(115200);
   //device.MonitorMode = true;
@@ -51,5 +71,4 @@ void loop()
   }
   device.Run();
 }
-
 
