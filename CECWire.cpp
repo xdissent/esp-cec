@@ -92,20 +92,20 @@ bool CEC_Electrical::CheckAddress()
 	return true;
 }
 
-void CEC_Electrical::ReceivedBit(bool state)
+void CEC_Electrical::ReceivedBit(bool bit)
 {
 	if (_tertiaryState == CEC_RCV_BIT_EOM)
 	{
-		//DbgPrint("%p: Received eom %d\n", this, state?1:0);
-		_eom = state;
+		_eom = bit;
 	}
 	else
 	{
-		//DbgPrint("%p: Received bit %d\n", this, state?1:0);
-		if (state)
-			PushReceiveBit(1);
-		else
-			PushReceiveBit(0);
+		unsigned int idx = _receiveBufferBits >> 3;
+		if (idx < sizeof(_receiveBuffer))
+		{
+			_receiveBuffer[idx] = (_receiveBuffer[idx] << 1) | bit;
+			_receiveBufferBits++;
+		}
 	}
 }
 
@@ -603,7 +603,7 @@ bool CEC_Electrical::ResetState()
 	_eom = false;
 	_follower = false;
 	_broadcast = false;
-	ResetReceiveBuffer();
+	_receiveBufferBits = 0;
 
 	if (_transmitPending)
         {
@@ -647,9 +647,9 @@ void CEC_Electrical::ResetTransmit(bool retransmit)
 
 void CEC_Electrical::ProcessFrame()
 {
-	// We've successfully received a frame in the serial line buffer
-	// Allow it to be processed
-	OnReceiveComplete(_receiveBuffer, _receiveBufferByte);
+	// We've successfully received a frame, allow it to be processed
+	OnReceiveComplete(_receiveBuffer, ReceivedBytes());
+	_receiveBufferBits = 0;
 }
 
 void CEC_Electrical::OnTransmitBegin()
@@ -663,8 +663,4 @@ void CEC_Electrical::OnTransmitBegin()
 		}
 		_transmitPending = true;
 	}
-}
-
-void CEC_Electrical::OnTransmitComplete(bool success)
-{
 }

@@ -21,6 +21,8 @@ public:
 protected:
 	virtual bool LineState() = 0;
 	virtual void SetLineState(bool) = 0;
+	virtual void OnTransmitComplete(bool) = 0;
+	virtual void OnReceiveComplete(unsigned char* buffer, int count) = 0;
 
 private:
 	typedef enum {
@@ -82,12 +84,14 @@ private:
 		CEC_IDLE_SUBSEQUENT_FRAME,
 	} CEC_TERTIARY_STATE;
 
-private:
+	// Receive buffer
+	unsigned char _receiveBuffer[16];
+	unsigned int _receiveBufferBits;
+	unsigned int ReceivedBytes() { return _receiveBufferBits >> 3; }
+
 	bool ResetState();
 	void ResetTransmit(bool retransmit);
 	virtual void OnTransmitBegin();
-	virtual void OnTransmitComplete(bool);
-
 	void ProcessFrame();
 
 	// Helper functions

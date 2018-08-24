@@ -5,14 +5,6 @@ SerialLine::SerialLine()
 	_transmitBufferCount = 0;
 	_transmitBufferBit = 7;
 	_transmitBufferByte = 0;
-	_receiveBufferCount = 0;
-	_receiveBufferBit = 7;
-	_receiveBufferByte = 0;
-}
-
-void SerialLine::OnReceiveComplete(unsigned char* buffer, int count)
-{
-	ResetReceiveBuffer();
 }
 
 void SerialLine::ClearTransmitBuffer()
@@ -66,28 +58,6 @@ int SerialLine::RemainingTransmitBytes()
 int SerialLine::TransmitSize()
 {
 	return _transmitBufferCount;
-}
-
-void SerialLine::PushReceiveBit(int bit)
-{
-	_receiveBuffer[_receiveBufferByte] &= ~(1 << _receiveBufferBit);
-	_receiveBuffer[_receiveBufferByte] |= bit << _receiveBufferBit;
-	if (_receiveBufferBit-- == 0)
-	{
-		_receiveBufferBit = 7;
-		_receiveBufferByte++;
-	}
-}
-
-int SerialLine::ReceivedBytes()
-{
-	return _receiveBufferByte;
-}
-
-void SerialLine::ResetReceiveBuffer()
-{
-	_receiveBufferBit = 7;
-	_receiveBufferByte = 0;
 }
 
 void SerialLine::ResetTransmitBuffer()
