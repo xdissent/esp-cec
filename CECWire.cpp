@@ -563,7 +563,7 @@ unsigned long CEC_Electrical::Process()
 				// normally we retransmit.  But this is NOT the case for <Polling Message> as its
 				// function is basically to 'ping' a logical address in which case we just want 
 				// acknowledgement that it has succeeded or failed
-				if (RemainingTransmitBytes() == 0 &&  TransmitSize() == 1)
+				if (_transmitBufferBytes == 1)
 				{
 					ResetState();
 					OnTransmitComplete(false);
@@ -604,6 +604,8 @@ bool CEC_Electrical::ResetState()
 	_follower = false;
 	_broadcast = false;
 	_receiveBufferBits = 0;
+	_transmitBufferBytes = 0;
+	_transmitBufferBitIdx = 0;
 
 	if (_transmitPending)
         {
@@ -632,7 +634,7 @@ void CEC_Electrical::ResetTransmit(bool retransmit)
 		{
 			//DbgPrint("%p: Retransmitting current frame\n", this);
 			_tertiaryState = CEC_IDLE_RETRANSMIT_FRAME;
-			ResetTransmitBuffer();
+			_transmitBufferBitIdx = 0;
 		}
 	}
 	else 
@@ -652,15 +654,47 @@ void CEC_Electrical::ProcessFrame()
 	_receiveBufferBits = 0;
 }
 
-void CEC_Electrical::OnTransmitBegin()
+bool CEC_Electrical::Transmit(unsigned char* buffer, unsigned int count)
 {
+	if (!TransmitPartial(buffer, count))
+		return false;
+
 	if (!MonitorMode)
 	{
 		if (_primaryState == CEC_IDLE)
 		{
 			ResetTransmit(false);
-			return;
 		}
-		_transmitPending = true;
+		else
+		{
+			_transmitPending = true;
+		}
 	}
+	return true;
+}
+
+bool CEC_Electrical::TransmitPartial(unsigned char* buffer, unsigned int count)
+{
+	if (count >= (sizeof(_transmitBuffer) - _transmitBufferBytes))
+		return false;
+
+	for (int i = 0; i < count; i++)
+		_transmitBuffer[_transmitBufferBytes + i] = buffer[i];
+	_transmitBufferBytes += count;
+	return true;
+}
+
+bool CEC_Electrical::PopTransmitBit()
+{
+	unsigned int byteIdx = _transmitBufferBitIdx >> 3;
+	if (byteIdx >= _transmitBufferBytes)
+		return false;
+
+	unsigned char b = _transmitBuffer[byteIdx] << (_transmitBufferBitIdx++ & 7);
+	return b >> 7;
+}
+
+int CEC_Electrical::RemainingTransmitBytes()
+{
+	return _transmitBufferBytes - (_transmitBufferBitIdx >> 3);
 }

@@ -1,11 +1,11 @@
 #ifndef CECWIRE_H__
 #define CECWIRE_H__
 
-#include "Serial.h"
+#include "Common.h"
 
 #define CEC_MAX_RETRANSMIT 5
 
-class CEC_Electrical : public SerialLine
+class CEC_Electrical
 {
 public:
 	CEC_Electrical(int address);
@@ -23,6 +23,8 @@ protected:
 	virtual void SetLineState(bool) = 0;
 	virtual void OnTransmitComplete(bool) = 0;
 	virtual void OnReceiveComplete(unsigned char* buffer, int count) = 0;
+	virtual bool Transmit(unsigned char* buffer, unsigned int count);
+	virtual bool TransmitPartial(unsigned char* buffer, unsigned int count);
 
 private:
 	typedef enum {
@@ -89,9 +91,15 @@ private:
 	unsigned int _receiveBufferBits;
 	unsigned int ReceivedBytes() { return _receiveBufferBits >> 3; }
 
+	// Transmit buffer
+	unsigned char _transmitBuffer[16];
+	unsigned int _transmitBufferBytes;
+	unsigned int _transmitBufferBitIdx;
+	bool PopTransmitBit();
+	int RemainingTransmitBytes();
+
 	bool ResetState();
 	void ResetTransmit(bool retransmit);
-	virtual void OnTransmitBegin();
 	void ProcessFrame();
 
 	// Helper functions

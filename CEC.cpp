@@ -50,7 +50,6 @@ bool CEC_LogicalDevice::ProcessStateMachine(bool* success)
 			// Section 6.1.3 specifies that <Polling Message> while allocating a Logical Address
 			// will have the same initiator and destination address
 			buffer[0] = MAKE_ADDRESS(_validLogicalAddresses[_deviceType][_tertiaryState], _validLogicalAddresses[_deviceType][_tertiaryState]);
-			ClearTransmitBuffer();
 			Transmit(buffer, 1);
 			
 			_secondaryState = CEC_RCV_POLLING_MESSAGE;
@@ -117,7 +116,6 @@ bool CEC_LogicalDevice::TransmitFrame(int targetAddress, unsigned char* buffer, 
 	unsigned char addr[1];
 
 	addr[0] = MAKE_ADDRESS(_logicalAddress, targetAddress);
-        ClearTransmitBuffer();
 	if (!TransmitPartial(addr, 1))
 		return false;
 	return Transmit(buffer, count);
