@@ -654,33 +654,24 @@ void CEC_Electrical::ProcessFrame()
 	_receiveBufferBits = 0;
 }
 
-bool CEC_Electrical::Transmit(unsigned char* buffer, unsigned int count)
+bool CEC_Electrical::Transmit(int sourceAddress, int targetAddress, unsigned char* buffer, unsigned int count)
 {
-	if (!TransmitPartial(buffer, count))
-		return false;
+	if (MonitorMode)
+		return false; // we must not transmit in monitor mode
+	if (_transmitBufferBytes != 0)
+		return false; // pending transmit packet
+	if (count >= sizeof(_transmitBuffer))
+		return false; // packet too big
 
-	if (!MonitorMode)
-	{
-		if (_primaryState == CEC_IDLE)
-		{
-			ResetTransmit(false);
-		}
-		else
-		{
-			_transmitPending = true;
-		}
-	}
-	return true;
-}
-
-bool CEC_Electrical::TransmitPartial(unsigned char* buffer, unsigned int count)
-{
-	if (count >= (sizeof(_transmitBuffer) - _transmitBufferBytes))
-		return false;
-
+	_transmitBuffer[0] = (sourceAddress << 4) | (targetAddress & 0xf);
 	for (int i = 0; i < count; i++)
-		_transmitBuffer[_transmitBufferBytes + i] = buffer[i];
-	_transmitBufferBytes += count;
+		_transmitBuffer[i+1] = buffer[i];
+	_transmitBufferBytes = count + 1;
+
+	if (_primaryState == CEC_IDLE)
+		ResetTransmit(false);
+	else
+		_transmitPending = true;
 	return true;
 }
 

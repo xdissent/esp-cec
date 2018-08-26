@@ -23,8 +23,7 @@ protected:
 	virtual void SetLineState(bool) = 0;
 	virtual void OnTransmitComplete(bool) = 0;
 	virtual void OnReceiveComplete(unsigned char* buffer, int count) = 0;
-	virtual bool Transmit(unsigned char* buffer, unsigned int count);
-	virtual bool TransmitPartial(unsigned char* buffer, unsigned int count);
+	bool Transmit(int sourceAddress, int targetAddress, unsigned char* buffer, unsigned int count);
 
 private:
 	typedef enum {

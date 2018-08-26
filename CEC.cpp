@@ -9,9 +9,6 @@ int CEC_LogicalDevice::_validLogicalAddresses[6][5] =
 		{CLA_UNREGISTERED,			CLA_UNREGISTERED,		CLA_UNREGISTERED,		CLA_UNREGISTERED,	CLA_UNREGISTERED,	},
 		};
 
-#define MAKE_ADDRESS(s,d) ((((s) & 0xf) << 4) | ((d) & 0xf))
-
-
 CEC_LogicalDevice::CEC_LogicalDevice(int physicalAddress)
 : CEC_Electrical(CLA_UNREGISTERED)
 , _physicalAddress(physicalAddress)
@@ -38,7 +35,6 @@ void CEC_LogicalDevice::Initialize(CEC_DEVICE_TYPE type)
 
 bool CEC_LogicalDevice::ProcessStateMachine(bool* success)
 {
-	unsigned char buffer[1];
 	bool wait = false;
 
 	switch (_primaryState)
@@ -49,8 +45,7 @@ bool CEC_LogicalDevice::ProcessStateMachine(bool* success)
 		case CEC_XMIT_POLLING_MESSAGE:
 			// Section 6.1.3 specifies that <Polling Message> while allocating a Logical Address
 			// will have the same initiator and destination address
-			buffer[0] = MAKE_ADDRESS(_validLogicalAddresses[_deviceType][_tertiaryState], _validLogicalAddresses[_deviceType][_tertiaryState]);
-			Transmit(buffer, 1);
+			Transmit(_validLogicalAddresses[_deviceType][_tertiaryState], _validLogicalAddresses[_deviceType][_tertiaryState], NULL, 0);
 			
 			_secondaryState = CEC_RCV_POLLING_MESSAGE;
 			wait = true;
@@ -113,12 +108,7 @@ bool CEC_LogicalDevice::TransmitFrame(int targetAddress, unsigned char* buffer, 
 	if (_primaryState != CEC_IDLE)
 		return false;
 
-	unsigned char addr[1];
-
-	addr[0] = MAKE_ADDRESS(_logicalAddress, targetAddress);
-	if (!TransmitPartial(addr, 1))
-		return false;
-	return Transmit(buffer, count);
+	return Transmit(_logicalAddress, targetAddress, buffer, count);
 }
 
 void CEC_LogicalDevice::OnTransmitComplete(bool success)
