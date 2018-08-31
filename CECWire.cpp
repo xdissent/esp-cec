@@ -94,7 +94,7 @@ bool CEC_Electrical::CheckAddress()
 
 void CEC_Electrical::ReceivedBit(bool bit)
 {
-	if (_tertiaryState == CEC_RCV_BIT_EOM)
+	if (_secondaryState == CEC_RCV_EOM1)
 	{
 		_eom = bit;
 	}
@@ -202,7 +202,6 @@ unsigned long CEC_Electrical::Process()
 				// We've fully received the start bit.  Begin receiving
 				// a data bit
 				_secondaryState = CEC_RCV_DATABIT1;
-				_tertiaryState = CEC_RCV_BIT0;
 				break;
 			}
 			// Illegal state.  Go back to CEC_IDLE to wait for a valid
@@ -212,34 +211,32 @@ unsigned long CEC_Electrical::Process()
 			break;
 		
 		case CEC_RCV_DATABIT1:
-			// We've received the rising edge of the data bit
+		case CEC_RCV_EOM1:
+			// We've received the rising edge of the data/eom bit
+			bool bit;
 			if (difftime >= 400 && difftime <= 800)
-			{
-				// We're receiving bit '1'
-				ReceivedBit(true);
-				_secondaryState = CEC_RCV_DATABIT2;
-				break;
-			}
+				bit = true;
 			else if (difftime >= 1300 && difftime <= 1700)
+				bit = false;
+			else
 			{
-				// We're receiving bit '0'
-				ReceivedBit(false);
-				_secondaryState = CEC_RCV_DATABIT2;
+				// Illegal state.  Go back to CEC_IDLE to wait for a valid
+				// start bit
+				waitTime = LineError();
 				break;
 			}
-			// Illegal state.  Go back to CEC_IDLE to wait for a valid
-			// start bit
-			waitTime = LineError();
+			ReceivedBit(bit);
+			_secondaryState = (CEC_SECONDARY_STATE)(_secondaryState + 1);
 			break;
 
 		case CEC_RCV_DATABIT2:
+		case CEC_RCV_EOM2:
 			// We've received the falling edge of the data bit
 			if (difftime >= 2050 && difftime <= 2750)
 			{
-				if (_tertiaryState == CEC_RCV_BIT_EOM)
+				if (_secondaryState == CEC_RCV_EOM2)
 				{
 					_secondaryState = CEC_RCV_ACK1;
-					_tertiaryState = (CEC_TERTIARY_STATE)(_tertiaryState + 1);
 
 					// Check to see if the frame is addressed to us
 					// or if we are in promiscuous mode (in which case we'll receive everything)
@@ -261,8 +258,7 @@ unsigned long CEC_Electrical::Process()
 					break;
 				}
 				// Receive another bit
-				_secondaryState = CEC_RCV_DATABIT1;
-				_tertiaryState = (CEC_TERTIARY_STATE)(_tertiaryState + 1);
+				_secondaryState = ((_receiveBufferBits & 7) == 0) ? CEC_RCV_EOM1 : CEC_RCV_DATABIT1;
 				break;
 			}
 			// Illegal state.  Go back to CEC_IDLE to wait for a valid
@@ -287,7 +283,6 @@ unsigned long CEC_Electrical::Process()
 			// We need to wait for the falling edge of the ACK
 			// to finish processing this ack
 			_secondaryState = CEC_RCV_ACK2;
-			_tertiaryState = CEC_ACK;
 			break;
 
 		// FIXME:  This is dead state
@@ -339,7 +334,6 @@ unsigned long CEC_Electrical::Process()
 			if (difftime >= 2050 && difftime <= 2750)
 			{
 				_secondaryState = CEC_RCV_DATABIT1;
-				_tertiaryState = CEC_RCV_BIT0;
 				break;
 			}
 			// Illegal state (or NACK).  Either way, go back to CEC_IDLE
