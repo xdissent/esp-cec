@@ -62,6 +62,7 @@ private:
 		CEC_ACK,
 		CEC_NAK,
 
+		CEC_XMIT_START,
 		CEC_XMIT_BIT0,
 		CEC_XMIT_BIT1,
 		CEC_XMIT_BIT2,

@@ -445,28 +445,7 @@ unsigned long CEC_Electrical::Process()
 
 			waitTime = _bitStartTime + 4500;
 			_secondaryState = CEC_XMIT_STARTBIT2;
-			break;
-
-		case CEC_XMIT_STARTBIT2:
-		case CEC_XMIT_ACK4:
-			Lower();
-			_bitStartTime = time;
-
-			_secondaryState = CEC_XMIT_DATABIT1;
-			_tertiaryState = CEC_XMIT_BIT0;
-
-			if (PopTransmitBit())
-			{
-				// Sending bit '1'
-				//DbgPrint("%p: Sending bit 1\n", this);
-				waitTime = _bitStartTime + 600;
-			}
-			else
-			{
-				// Sending bit '0'
-				//DbgPrint("%p: Sending bit 0\n", this);
-				waitTime = _bitStartTime + 1500;
-			}
+			_tertiaryState = CEC_XMIT_START;
 			break;
 
 		case CEC_XMIT_DATABIT1:
@@ -489,7 +468,9 @@ unsigned long CEC_Electrical::Process()
 				_secondaryState = CEC_XMIT_DATABIT2;
 			break;
 
+		case CEC_XMIT_STARTBIT2:
 		case CEC_XMIT_DATABIT2:
+		case CEC_XMIT_ACK4:
 			Lower();
 			_bitStartTime = time;
 
@@ -587,6 +568,7 @@ unsigned long CEC_Electrical::Process()
 			{
 				_secondaryState = CEC_XMIT_ACK3;
 			}
+			_tertiaryState = CEC_XMIT_START;
 			break;
 		case CEC_XMIT_ACK3:
 			// received rising edge of ack
