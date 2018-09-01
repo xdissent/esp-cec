@@ -133,9 +133,7 @@ void CEC_LogicalDevice::Run()
 	if (((_waitTime == (unsigned long)-1 && !TransmitPending()) || (_waitTime != (unsigned long)-1 && _waitTime > micros())) && !IsISRTriggered())
 		return;
 
-        unsigned long wait = Process();
-        if (wait != (unsigned long)-2)
-	        _waitTime = wait;
+        _waitTime = Process();
 	return;
 }
 

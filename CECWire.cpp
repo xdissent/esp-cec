@@ -50,8 +50,6 @@ bool CEC_Electrical::Lower()
 	// Only update state if the line was actually changed (i.e. it wasn't already in its new state)
 	if (!LineState())
 	{
-		if (_lastLineState)
-			_bitStartTime = time;
 		_lastLineState = false;
 		_lastStateChangeTime = time;
 		return false;
@@ -69,7 +67,6 @@ void CEC_Electrical::HasLowered(unsigned long time)
 {
 	_lastLineState = false;
 	_lastStateChangeTime = time;
-	_bitStartTime = time;
 }
 
 bool CEC_Electrical::CheckAddress()
@@ -168,6 +165,7 @@ unsigned long CEC_Electrical::Process()
 		{
 			_primaryState = CEC_RECEIVE;
 			_secondaryState = CEC_RCV_STARTBIT1;
+			_bitStartTime = time;
 			_follower = false;
 			_broadcast = false;
 			_amLastTransmittor = false;
@@ -202,6 +200,7 @@ unsigned long CEC_Electrical::Process()
 				// We've fully received the start bit.  Begin receiving
 				// a data bit
 				_secondaryState = CEC_RCV_DATABIT1;
+				_bitStartTime = time;
 				break;
 			}
 			// Illegal state.  Go back to CEC_IDLE to wait for a valid
@@ -234,6 +233,7 @@ unsigned long CEC_Electrical::Process()
 			// We've received the falling edge of the data bit
 			if (difftime >= 2050 && difftime <= 2750)
 			{
+				_bitStartTime = time;
 				if (_secondaryState == CEC_RCV_EOM2)
 				{
 					_secondaryState = CEC_RCV_ACK1;
@@ -334,6 +334,7 @@ unsigned long CEC_Electrical::Process()
 			if (difftime >= 2050 && difftime <= 2750)
 			{
 				_secondaryState = CEC_RCV_DATABIT1;
+				_bitStartTime = time;
 				break;
 			}
 			// Illegal state (or NACK).  Either way, go back to CEC_IDLE
@@ -359,10 +360,8 @@ unsigned long CEC_Electrical::Process()
 
 			// However it is OK for a follower to ACK if we are in an
 			// ACK state
-			if (_secondaryState != CEC_XMIT_ACK &&
-				_secondaryState != CEC_XMIT_ACK2 &&
-				_secondaryState != CEC_XMIT_ACK3 &&
-				_secondaryState != CEC_XMIT_ACK_TEST)
+			if (_secondaryState != CEC_XMIT_ACK3 &&
+			    _secondaryState != CEC_XMIT_ACK_TEST)
 			{
 				// If a state changed TO LOW during IDLE wait, someone could be legitimately transmitting
 				if (_secondaryState == CEC_IDLE_WAIT)
@@ -371,6 +370,7 @@ unsigned long CEC_Electrical::Process()
 					{
 						_primaryState = CEC_RECEIVE;
 						_secondaryState = CEC_RCV_STARTBIT1;
+						_bitStartTime = time;
 						_transmitPending = true;
 					}
 					break;
@@ -382,13 +382,6 @@ unsigned long CEC_Electrical::Process()
 					waitTime = 0;
 					break;
 				}
-			}
-			else
-			{
-				// This is a state change from an ACK and isn't part of our state
-				// tracking.
-                                waitTime = -2;
-				break;
 			}
 		}
 
@@ -431,6 +424,7 @@ unsigned long CEC_Electrical::Process()
 
 			// we've wait long enough, begin start bit
 			Lower();
+			_bitStartTime = time;
 			_amLastTransmittor = true;
 			_broadcast = (_transmitBuffer[0] & 0x0f) == 0x0f;
 
@@ -454,8 +448,9 @@ unsigned long CEC_Electrical::Process()
 			break;
 
 		case CEC_XMIT_STARTBIT2:
-		case CEC_XMIT_ACK3:
+		case CEC_XMIT_ACK4:
 			Lower();
+			_bitStartTime = time;
 
 			_secondaryState = CEC_XMIT_DATABIT1;
 			_tertiaryState = CEC_XMIT_BIT0;
@@ -496,6 +491,7 @@ unsigned long CEC_Electrical::Process()
 
 		case CEC_XMIT_DATABIT2:
 			Lower();
+			_bitStartTime = time;
 
 			_tertiaryState = (CEC_TERTIARY_STATE)(_tertiaryState + 1);
 
@@ -534,6 +530,7 @@ unsigned long CEC_Electrical::Process()
 
 		case CEC_XMIT_ACK:
 			Lower();
+			_bitStartTime = time;
 
 			// We transmit a '1'
 			//DbgPrint("%p: Sending ack\n", this);
@@ -581,9 +578,22 @@ unsigned long CEC_Electrical::Process()
 			}
 
 			// We have more to transmit, so do so...
-			waitTime = _bitStartTime + 2400;
-			_secondaryState = CEC_XMIT_ACK3;
+			if (currentLineState != 0)
+			{
+				waitTime = _bitStartTime + 2400;
+				_secondaryState = CEC_XMIT_ACK4;
+			}
+			else
+			{
+				_secondaryState = CEC_XMIT_ACK3;
+			}
 			break;
+		case CEC_XMIT_ACK3:
+			// received rising edge of ack
+			waitTime = _bitStartTime + 2400;
+			_secondaryState = CEC_XMIT_ACK4;
+			break;
+
 		}
 	}
 	return waitTime;	
