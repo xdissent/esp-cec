@@ -57,55 +57,6 @@ bool CEC_Electrical::Lower()
 	return true;
 }
 
-void CEC_Electrical::HasRaised(unsigned long time)
-{
-	_lastLineState = true;
-	_lastStateChangeTime = time;
-}
-
-void CEC_Electrical::HasLowered(unsigned long time)
-{
-	_lastLineState = false;
-	_lastStateChangeTime = time;
-}
-
-bool CEC_Electrical::CheckAddress()
-{
-	if (ReceivedBytes() == 1)
-	{
-		int address = _receiveBuffer[0] & 0x0f;
-		if (address != _address && address != 0x0f)
-		{
-			// It's not addressed to us and it's not a broadcast.
-			// Reset and wait for the next start bit
-			return false;
-		}
-		// It is either addressed to this device or its a broadcast
-		if (address == 0x0f)
-			_broadcast = true;
-		else
-			_follower = true;
-	}
-	return true;
-}
-
-void CEC_Electrical::ReceivedBit(bool bit)
-{
-	if (_secondaryState == CEC_RCV_EOM1)
-	{
-		_eom = bit;
-	}
-	else
-	{
-		unsigned int idx = _receiveBufferBits >> 3;
-		if (idx < sizeof(_receiveBuffer))
-		{
-			_receiveBuffer[idx] = (_receiveBuffer[idx] << 1) | bit;
-			_receiveBufferBits++;
-		}
-	}
-}
-
 unsigned long CEC_Electrical::LineError()
 {
         DbgPrint("%p: Line Error!\n", this);
@@ -150,10 +101,8 @@ unsigned long CEC_Electrical::Process()
 	if( currentLineState != lastLineState )
 	{
 		// Line state has changed, update our internal state
-		if (currentLineState)
-			HasRaised(time);
-		else
-			HasLowered(time);
+		_lastLineState = currentLineState;
+		_lastStateChangeTime = time;
 	}
 
 	switch (_primaryState)
@@ -224,7 +173,20 @@ unsigned long CEC_Electrical::Process()
 				waitTime = LineError();
 				break;
 			}
-			ReceivedBit(bit);
+			// Save the received bit
+			if (_secondaryState == CEC_RCV_EOM1)
+			{
+				_eom = bit;
+			}
+			else
+			{
+				unsigned int idx = _receiveBufferBits >> 3;
+				if (idx < sizeof(_receiveBuffer))
+				{
+					_receiveBuffer[idx] = (_receiveBuffer[idx] << 1) | bit;
+					_receiveBufferBits++;
+				}
+			}
 			_secondaryState = (CEC_SECONDARY_STATE)(_secondaryState + 1);
 			break;
 
@@ -240,12 +202,11 @@ unsigned long CEC_Electrical::Process()
 
 					// Check to see if the frame is addressed to us
 					// or if we are in promiscuous mode (in which case we'll receive everything)
-					if (!CheckAddress() && !Promiscuous)
-					{
-						// It's not addressed to us.  Reset and wait for the next start bit
-                			        waitTime = ResetState() ? micros() : (unsigned long)-1;
-						break;
-					}
+					int address = _receiveBuffer[0] & 0x0f;
+					if (address == 0x0f)
+						_broadcast = true;
+					else if (address == _address)
+						_follower = true;
 
 					// If we're the follower, go low for a while
 					if (_follower)
@@ -254,6 +215,11 @@ unsigned long CEC_Electrical::Process()
 
 						_secondaryState = CEC_RCV_ACK_SENT;
 						waitTime = _bitStartTime + 1500;
+					}
+					else if (!Promiscuous && !_broadcast)
+					{
+						// It's not addressed to us.  Reset and wait for the next start bit
+						waitTime = ResetState() ? micros() : (unsigned long)-1;
 					}
 					break;
 				}
@@ -478,33 +444,15 @@ unsigned long CEC_Electrical::Process()
 
 			if (_tertiaryState == CEC_XMIT_BIT_EOM)
 			{
-				if (RemainingTransmitBytes() == 0)
-				{
-					// Sending eom '1'
-					//DbgPrint("%p: Sending eom 1\n", this);
-					waitTime = _bitStartTime + 600;
-				}
-				else
-				{
-					// Sending eom '0'
-					//DbgPrint("%p: Sending eom 0\n", this);
-					waitTime = _bitStartTime + 1500;
-				}
+				// get EOM bit: transmit buffer empty?
+				_eom = (_transmitBufferBytes == (_transmitBufferBitIdx >> 3));
+				waitTime = _bitStartTime + ((_eom) ? 600 : 1500);
 			}
 			else
 			{
-				if (PopTransmitBit())
-				{
-					// Sending bit '1'
-					//DbgPrint("%p: Sending bit 1\n", this);
-					waitTime = _bitStartTime + 600;
-				}
-				else
-				{
-					// Sending bit '0'
-					//DbgPrint("%p: Sending bit 0\n", this);
-					waitTime = _bitStartTime + 1500;
-				}
+				// pull bit from transmit buffer
+				unsigned char b = _transmitBuffer[_transmitBufferBitIdx >> 3] << (_transmitBufferBitIdx++ & 7);
+				waitTime = _bitStartTime + (( b >> 7) ? 600 : 1500);
 			}
 			_secondaryState = CEC_XMIT_DATABIT1;
 			break;
@@ -550,7 +498,7 @@ unsigned long CEC_Electrical::Process()
 
 			_lastStateChangeTime = lasttime;
 
-			if (RemainingTransmitBytes() == 0)
+			if (_eom)
 			{
 				// Nothing left to transmit, go back to idle
 				ResetState();
@@ -636,7 +584,7 @@ void CEC_Electrical::ResetTransmit(bool retransmit)
 void CEC_Electrical::ProcessFrame()
 {
 	// We've successfully received a frame, allow it to be processed
-	OnReceiveComplete(_receiveBuffer, ReceivedBytes());
+	OnReceiveComplete(_receiveBuffer, _receiveBufferBits >> 3);
 	_receiveBufferBits = 0;
 }
 
@@ -659,19 +607,4 @@ bool CEC_Electrical::Transmit(int sourceAddress, int targetAddress, unsigned cha
 	else
 		_transmitPending = true;
 	return true;
-}
-
-bool CEC_Electrical::PopTransmitBit()
-{
-	unsigned int byteIdx = _transmitBufferBitIdx >> 3;
-	if (byteIdx >= _transmitBufferBytes)
-		return false;
-
-	unsigned char b = _transmitBuffer[byteIdx] << (_transmitBufferBitIdx++ & 7);
-	return b >> 7;
-}
-
-int CEC_Electrical::RemainingTransmitBytes()
-{
-	return _transmitBufferBytes - (_transmitBufferBitIdx >> 3);
 }

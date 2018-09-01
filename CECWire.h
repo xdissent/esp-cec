@@ -83,14 +83,11 @@ private:
 	// Receive buffer
 	unsigned char _receiveBuffer[16];
 	unsigned int _receiveBufferBits;
-	unsigned int ReceivedBytes() { return _receiveBufferBits >> 3; }
 
 	// Transmit buffer
 	unsigned char _transmitBuffer[16];
 	unsigned int _transmitBufferBytes;
 	unsigned int _transmitBufferBitIdx;
-	bool PopTransmitBit();
-	int RemainingTransmitBytes();
 
 	bool ResetState();
 	void ResetTransmit(bool retransmit);
@@ -99,14 +96,9 @@ private:
 	// Helper functions
 	bool Raise();
 	bool Lower();
-	void HasRaised(unsigned long);
-	void HasLowered(unsigned long);
-	bool CheckAddress();
-	void ReceivedBit(bool);
 	unsigned long LineError();
 
 	int _address;
-
 	bool _lastLineState;
 	unsigned long _lastStateChangeTime;
 	unsigned long _bitStartTime;
