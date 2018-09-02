@@ -311,8 +311,8 @@ unsigned long CEC_Electrical::Process()
 
 			// However it is OK for a follower to ACK if we are in an
 			// ACK state
-			if (_secondaryState != CEC_XMIT_ACK3 &&
-			    _secondaryState != CEC_XMIT_ACK_TEST)
+			if (_secondaryState != CEC_XMIT_ACK_TEST &&
+			    _secondaryState != CEC_XMIT_ACK_WAIT)
 			{
 				// If a state changed TO LOW during IDLE wait, someone could be legitimately transmitting
 				if (_secondaryState == CEC_IDLE_WAIT)
@@ -387,76 +387,63 @@ unsigned long CEC_Electrical::Process()
 			break;
 
 		case CEC_XMIT_STARTBIT1:
+			// We're at start bit low, send the rising edge of the start bit
 			if (!Raise())
 			{
 				//DbgPrint("%p: Received Line Error\n", this);
 				ResetTransmit(true);
 				break;
 			}
-
 			waitTime = _bitStartTime + 4500;
 			_secondaryState = CEC_XMIT_STARTBIT2;
-			_tertiaryState = CEC_XMIT_START;
 			break;
 
 		case CEC_XMIT_DATABIT1:
+		case CEC_XMIT_EOM1:
+			// We finished the first half of the bit, send the rising edge
 			if (!Raise())
 			{
 				//DbgPrint("%p: Received Line Error\n", this);
 				ResetTransmit(true);
 				break;
 			}
-
 			waitTime = _bitStartTime + 2400;
-
-			if (_tertiaryState == CEC_XMIT_BIT_EOM)
-			{
-				// We've just finished transmitting the EOM
-				// move on to the ACK
-				_secondaryState = CEC_XMIT_ACK;
-			}			
-			else
-				_secondaryState = CEC_XMIT_DATABIT2;
+			_secondaryState = (CEC_SECONDARY_STATE)(_secondaryState + 1);
 			break;
 
 		case CEC_XMIT_STARTBIT2:
 		case CEC_XMIT_DATABIT2:
-		case CEC_XMIT_ACK4:
+		case CEC_XMIT_EOM2:
+		case CEC_XMIT_ACK2:
+			// We finished the second half of the previous bit, send the falling edge of the new bit
 			Lower();
 			_bitStartTime = time;
-
-			_tertiaryState = (CEC_TERTIARY_STATE)(_tertiaryState + 1);
-
-			if (_tertiaryState == CEC_XMIT_BIT_EOM)
+			bool bit;
+			if (_secondaryState == CEC_XMIT_DATABIT2 && (_transmitBufferBitIdx & 7) == 0)
 			{
-				// get EOM bit: transmit buffer empty?
-				_eom = (_transmitBufferBytes == (_transmitBufferBitIdx >> 3));
-				waitTime = _bitStartTime + ((_eom) ? 600 : 1500);
+				_secondaryState = CEC_XMIT_EOM1;
+				// Get EOM bit: transmit buffer empty?
+				bit = _eom = (_transmitBufferBytes == (_transmitBufferBitIdx >> 3));
+			}
+			else if (_secondaryState == CEC_XMIT_EOM2)
+			{
+				_secondaryState = CEC_XMIT_ACK1;
+				bit = true; // We transmit a '1'
 			}
 			else
 			{
-				// pull bit from transmit buffer
+				_secondaryState = CEC_XMIT_DATABIT1;
+				// Pull bit from transmit buffer
 				unsigned char b = _transmitBuffer[_transmitBufferBitIdx >> 3] << (_transmitBufferBitIdx++ & 7);
-				waitTime = _bitStartTime + (( b >> 7) ? 600 : 1500);
+				bit = b >> 7;
 			}
-			_secondaryState = CEC_XMIT_DATABIT1;
+			waitTime = _bitStartTime + (bit ? 600 : 1500);
 			break;
 
-		case CEC_XMIT_ACK:
-			Lower();
-			_bitStartTime = time;
-
-			// We transmit a '1'
-			//DbgPrint("%p: Sending ack\n", this);
-			waitTime = _bitStartTime + 600;
-			_secondaryState = CEC_XMIT_ACK2;
-			break;
-
-		case CEC_XMIT_ACK2:
-			Raise();
-
-			// we need to sample the state in a little bit
-			waitTime = _bitStartTime + 1050;
+		case CEC_XMIT_ACK1:
+			// We finished the first half of the ack bit, release the line
+			Raise();                         // No check, maybe follower pulls low for ACK
+			waitTime = _bitStartTime + 1050; // We need to sample the state in a little bit
 			_secondaryState = CEC_XMIT_ACK_TEST;
 			break;
 
@@ -480,9 +467,7 @@ unsigned long CEC_Electrical::Process()
 				}
 				break;
 			}
-
 			_lastStateChangeTime = lasttime;
-
 			if (_eom)
 			{
 				// Nothing left to transmit, go back to idle
@@ -490,25 +475,19 @@ unsigned long CEC_Electrical::Process()
 				ResetState();
 				break;
 			}
-
 			// We have more to transmit, so do so...
-			if (currentLineState != 0)
+			_secondaryState = CEC_XMIT_ACK_WAIT; // wait for line going high
+			if (currentLineState != 0)           // already high, no ACK from follower
 			{
 				waitTime = _bitStartTime + 2400;
-				_secondaryState = CEC_XMIT_ACK4;
+				_secondaryState = CEC_XMIT_ACK2;
 			}
-			else
-			{
-				_secondaryState = CEC_XMIT_ACK3;
-			}
-			_tertiaryState = CEC_XMIT_START;
 			break;
-		case CEC_XMIT_ACK3:
-			// received rising edge of ack
+		case CEC_XMIT_ACK_WAIT:
+			// We received the rising edge of ack from follower
 			waitTime = _bitStartTime + 2400;
-			_secondaryState = CEC_XMIT_ACK4;
+			_secondaryState = CEC_XMIT_ACK2;
 			break;
-
 		}
 	}
 	return waitTime;	
