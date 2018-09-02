@@ -85,7 +85,6 @@ unsigned long CEC_Electrical::Process()
 	unsigned long waitTime = -1;	// INFINITE; (== wait until an external event has occurred)
 	unsigned long time = micros();
 
-//DbgPrint("%d %d %d\n", _primaryState, _secondaryState, _tertiaryState);
 	// If the state hasn't changed and we're not in a transmit
 	// state then this is spurrious.
 	if( currentLineState == lastLineState &&
@@ -336,7 +335,6 @@ unsigned long CEC_Electrical::Process()
 			}
 		}
 
-		unsigned long neededIdleTime = 0;
 		switch (_secondaryState)
 		{
 		case CEC_IDLE_WAIT:
@@ -348,40 +346,24 @@ unsigned long CEC_Electrical::Process()
 			// catch in the code just above
 			if (currentLineState == 0)
 				break;
-
 			// The line is high.  Have we waited long enough?
-			neededIdleTime = 0;
-			switch (_tertiaryState)
-			{
-			case CEC_IDLE_RETRANSMIT_FRAME:
-				neededIdleTime = 3 * 2400;
-				break;
-
-			case CEC_IDLE_NEW_FRAME:
-				neededIdleTime = 5 * 2400;
-				break;
-
-			case CEC_IDLE_SUBSEQUENT_FRAME:
-				neededIdleTime = 7 * 2400;
-				break;
-			}
-
+			unsigned long neededIdleTime;
+			neededIdleTime = ((_xmitretry) ?  3 * 2400 :
+			                  (_amLastTransmittor) ? 7 * 2400 :
+			                  5 * 2400);
 			if (time - _lastStateChangeTime < neededIdleTime)
 			{
 				// not waited long enough, wait some more!
 				waitTime = lasttime + neededIdleTime;
 				break;
 			}
-
 			// we've wait long enough, begin start bit
 			Lower();
 			_bitStartTime = time;
 			_amLastTransmittor = true;
 			_broadcast = (_transmitBuffer[0] & 0x0f) == 0x0f;
-
 			// wait 3700 microsec
 			waitTime = _bitStartTime + 3700;
-			
 			// and transition to our next state
 			_secondaryState = CEC_XMIT_STARTBIT1;
 			break;
@@ -497,7 +479,6 @@ bool CEC_Electrical::ResetState()
 {
 	_primaryState = CEC_IDLE;
 	_secondaryState = (CEC_SECONDARY_STATE)0;
-	_tertiaryState = (CEC_TERTIARY_STATE)0;
 	_eom = false;
 	_follower = false;
 	_broadcast = false;
@@ -517,12 +498,11 @@ void CEC_Electrical::ResetTransmit(bool retransmit)
 {
 	_primaryState = CEC_TRANSMIT;
 	_secondaryState = CEC_IDLE_WAIT;
-	_tertiaryState = CEC_IDLE_NEW_FRAME;
 	_transmitPending = false;
 
-	if (retransmit)
-	{
-		if (++_xmitretry == CEC_MAX_RETRANSMIT)
+	if (!retransmit)
+		_xmitretry = 0;
+	else if (++_xmitretry == CEC_MAX_RETRANSMIT)
 		{
 			// No more
 			OnTransmitComplete(_transmitBuffer, _transmitBufferBitIdx >> 3, false);
@@ -531,18 +511,8 @@ void CEC_Electrical::ResetTransmit(bool retransmit)
 		else
 		{
 			//DbgPrint("%p: Retransmitting current frame\n", this);
-			_tertiaryState = CEC_IDLE_RETRANSMIT_FRAME;
 			_transmitBufferBitIdx = 0;
 		}
-	}
-	else 
-	{
-		_xmitretry = 0;
-		if (_amLastTransmittor)
-		{
-			_tertiaryState = CEC_IDLE_SUBSEQUENT_FRAME;
-		}
-	}
 }
 
 void CEC_Electrical::ProcessFrame(bool ack)

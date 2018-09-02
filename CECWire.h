@@ -3,8 +3,6 @@
 
 #include "Common.h"
 
-#define CEC_MAX_RETRANSMIT 5
-
 class CEC_Electrical
 {
 public:
@@ -57,12 +55,6 @@ private:
 		CEC_XMIT_ACK2,
 	} CEC_SECONDARY_STATE;
 
-	typedef enum {
-		CEC_IDLE_RETRANSMIT_FRAME,
-		CEC_IDLE_NEW_FRAME,
-		CEC_IDLE_SUBSEQUENT_FRAME,
-	} CEC_TERTIARY_STATE;
-
 	// Receive buffer
 	unsigned char _receiveBuffer[16];
 	unsigned int _receiveBufferBits;
@@ -87,6 +79,9 @@ private:
 	unsigned long _bitStartTime;
 
 	int _xmitretry;
+	enum {
+		CEC_MAX_RETRANSMIT = 5,
+	};
 
 	bool _eom;
 	bool _follower;
@@ -96,7 +91,6 @@ private:
 
 	CEC_PRIMARY_STATE _primaryState;
 	CEC_SECONDARY_STATE _secondaryState;
-	CEC_TERTIARY_STATE _tertiaryState;
 };
 
 
