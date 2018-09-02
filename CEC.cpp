@@ -96,13 +96,6 @@ bool CEC_LogicalDevice::ProcessStateMachine(bool* success)
 	return wait;
 }
 
-void CEC_LogicalDevice::OnReceiveComplete(unsigned char* buffer, int count)
-{
-	int sourceAddress = (buffer[0] >> 4) & 0x0f;
-	int targetAddress = buffer[0] & 0x0f;
-	OnReceive(sourceAddress, targetAddress, buffer + 1, count - 1);
-}
-
 bool CEC_LogicalDevice::TransmitFrame(int targetAddress, unsigned char* buffer, int count)
 {
 	if (_primaryState != CEC_IDLE)

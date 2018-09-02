@@ -21,15 +21,16 @@ void CEC_Device::OnReady()
   DbgPrint("Device ready\n");
 }
 
-extern "C" unsigned long millis();
-void CEC_Device::OnReceive(int source, int dest, unsigned char* buffer, int count)
+void CEC_Device::OnReceiveComplete(unsigned char* buffer, int count, bool ack)
 {
   // This is called when a frame is received.  To transmit
   // a frame call TransmitFrame.  To receive all frames, even
   // those not addressed to this device, set Promiscuous to true.
-  DbgPrint("Packet received at %ld: %02d -> %02d: %02X", millis(), source, dest, ((source&0x0f)<<4)|(dest&0x0f));
-  for (int i = 0; i < count; i++)
+  DbgPrint("Packet received at %ld: %02X", millis(), buffer[0]);
+  for (int i = 1; i < count; i++)
     DbgPrint(":%02X", buffer[i]);
+  if (!ack)
+    DbgPrint(" NAK");
   DbgPrint("\n");
 }
 

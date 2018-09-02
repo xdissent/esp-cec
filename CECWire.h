@@ -22,7 +22,7 @@ protected:
 	virtual bool LineState() = 0;
 	virtual void SetLineState(bool) = 0;
 	virtual void OnTransmitComplete(bool) = 0;
-	virtual void OnReceiveComplete(unsigned char* buffer, int count) = 0;
+	virtual void OnReceiveComplete(unsigned char* buffer, int count, bool ack) = 0;
 	bool Transmit(int sourceAddress, int targetAddress, unsigned char* buffer, unsigned int count);
 
 private:
@@ -59,9 +59,6 @@ private:
 	} CEC_SECONDARY_STATE;
 
 	typedef enum {
-		CEC_ACK,
-		CEC_NAK,
-
 		CEC_XMIT_START,
 		CEC_XMIT_BIT0,
 		CEC_XMIT_BIT1,
@@ -91,7 +88,7 @@ private:
 
 	bool ResetState();
 	void ResetTransmit(bool retransmit);
-	void ProcessFrame();
+	void ProcessFrame(bool ack);
 
 	// Helper functions
 	bool Raise();

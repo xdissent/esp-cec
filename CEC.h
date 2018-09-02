@@ -27,11 +27,9 @@ protected:
 
 	bool ProcessStateMachine(bool* success);
 
-	virtual void OnReceiveComplete(unsigned char* buffer, int count);
 	virtual void OnTransmitComplete(bool);
 
 	virtual void OnReady() {;}
-	virtual void OnReceive(int sourceAddress, int targetAddress, unsigned char* buffer, int count) = 0;
 
 private:
 	typedef enum {

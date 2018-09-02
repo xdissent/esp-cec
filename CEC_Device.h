@@ -19,8 +19,8 @@ protected:
   virtual bool IsISRTriggered2() { return _isrTriggered; }
 
   virtual void OnReady();
-  virtual void OnReceive(int source, int dest, unsigned char* buffer, int count);
-  
+  virtual void OnReceiveComplete(unsigned char* buffer, int count, bool ack);
+
 private:
 friend void XX_SetLineState(CEC_Device* device, bool state);
 friend bool XX_GetLineState();

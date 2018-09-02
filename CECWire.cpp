@@ -242,7 +242,7 @@ unsigned long CEC_Electrical::Process()
 				// And we've sent the ACK for the most recent bit
 				// therefore this message is all done.  Go back
 				// to the IDLE state and wait for another start bit.
-				ProcessFrame();
+				ProcessFrame(true);
 			        waitTime = ResetState() ? micros() : (unsigned long)-1;
 				break;
 			}
@@ -251,20 +251,13 @@ unsigned long CEC_Electrical::Process()
 			_secondaryState = CEC_RCV_ACK2;
 			break;
 
-		// FIXME:  This is dead state
-		// Code currently exists in CEC_RCV_DATABIT2 that checks the address
-		// of the frame and if it isn't addressed to this device it goes back
-		// to watching for a start bit state.  This state, CEC_RCV_ACK1, was
-		// from when we didn't do that and we followed state for all frames
-		// regardless of addressing.  However, I'm not removing this code because
-		// it will be needed when we support broadcast frames.
 		case CEC_RCV_ACK1:
 			{
-				int ack;
+				bool ack;
 				if (difftime >= 400 && difftime <= 800)
-					ack = _broadcast ? CEC_ACK : CEC_NAK;
+					ack = _broadcast;
 				else if (difftime >= 1300 && difftime <= 1700)
-					ack = _broadcast ? CEC_NAK : CEC_ACK;
+					ack = !_broadcast;
 				else
 				{
 					// Illegal state.  Go back to CEC_IDLE to wait for a valid
@@ -273,25 +266,17 @@ unsigned long CEC_Electrical::Process()
 					break;
 				}
 
-				if (_eom && ack == CEC_ACK)
+				if (!_eom && ack)
 				{
-					// We're not going to receive anything more from
-					// the initiator (EOM has been received)
-					// And we've seen the ACK for the most recent bit
-					// therefore this message is all done.  Go back
-					// to the IDLE state and wait for another start bit.
-					ProcessFrame();
-			                waitTime = ResetState() ? micros() : (unsigned long)-1;
+					// receive the rest of the ACK (or rather the beginning of the next bit)
+					_secondaryState = CEC_RCV_ACK2;
 					break;
 				}
-				if (ack == CEC_NAK)
-				{
-      			                waitTime = ResetState() ? micros() : (unsigned long)-1;
-					break;
-				}
-
-				// receive the rest of the ACK (or rather the beginning of the next bit)
-				_secondaryState = CEC_RCV_ACK2;
+				// We're not going to receive anything more from
+				// the initiator (EOM has been received).  Go back
+				// to the IDLE state and wait for another start bit.
+				ProcessFrame(ack);
+				waitTime = ResetState() ? micros() : (unsigned long)-1;
 				break;
 			}
 
@@ -581,10 +566,10 @@ void CEC_Electrical::ResetTransmit(bool retransmit)
 	}
 }
 
-void CEC_Electrical::ProcessFrame()
+void CEC_Electrical::ProcessFrame(bool ack)
 {
 	// We've successfully received a frame, allow it to be processed
-	OnReceiveComplete(_receiveBuffer, _receiveBufferBits >> 3);
+	OnReceiveComplete(_receiveBuffer, _receiveBufferBits >> 3, ack);
 	_receiveBufferBits = 0;
 }
 
