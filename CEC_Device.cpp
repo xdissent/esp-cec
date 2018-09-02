@@ -34,6 +34,18 @@ void CEC_Device::OnReceiveComplete(unsigned char* buffer, int count, bool ack)
   DbgPrint("\n");
 }
 
+void CEC_Device::OnTransmitComplete(unsigned char* buffer, int count, bool ack)
+{
+
+  DbgPrint("Packet sent at %ld: %02X", millis(), buffer[0]);
+  for (int i = 1; i < count; i++)
+    DbgPrint(":%02X", buffer[i]);
+  if (!ack)
+    DbgPrint(" NAK");
+  DbgPrint("\n");
+  CEC_LogicalDevice::OnTransmitComplete(buffer, count, ack);
+}
+
 bool CEC_Device::LineState()
 {
   return XX_GetLineState();

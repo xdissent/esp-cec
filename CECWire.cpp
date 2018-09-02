@@ -470,8 +470,8 @@ unsigned long CEC_Electrical::Process()
 				// acknowledgement that it has succeeded or failed
 				if (_transmitBufferBytes == 1)
 				{
+					OnTransmitComplete(_transmitBuffer, _transmitBufferBitIdx >> 3, false);
 					ResetState();
-					OnTransmitComplete(false);
 				}
 				else
 				{
@@ -486,8 +486,8 @@ unsigned long CEC_Electrical::Process()
 			if (_eom)
 			{
 				// Nothing left to transmit, go back to idle
+				OnTransmitComplete(_transmitBuffer, _transmitBufferBitIdx >> 3, true);
 				ResetState();
-				OnTransmitComplete(true);
 				break;
 			}
 
@@ -546,8 +546,8 @@ void CEC_Electrical::ResetTransmit(bool retransmit)
 		if (++_xmitretry == CEC_MAX_RETRANSMIT)
 		{
 			// No more
+			OnTransmitComplete(_transmitBuffer, _transmitBufferBitIdx >> 3, false);
 			ResetState();
-			OnTransmitComplete(false);
 		}
 		else
 		{

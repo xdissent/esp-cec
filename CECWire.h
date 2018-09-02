@@ -21,7 +21,7 @@ public:
 protected:
 	virtual bool LineState() = 0;
 	virtual void SetLineState(bool) = 0;
-	virtual void OnTransmitComplete(bool) = 0;
+	virtual void OnTransmitComplete(unsigned char* buffer, int count, bool ack) = 0;
 	virtual void OnReceiveComplete(unsigned char* buffer, int count, bool ack) = 0;
 	bool Transmit(int sourceAddress, int targetAddress, unsigned char* buffer, unsigned int count);
 

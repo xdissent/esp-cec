@@ -104,17 +104,15 @@ bool CEC_LogicalDevice::TransmitFrame(int targetAddress, unsigned char* buffer, 
 	return Transmit(_logicalAddress, targetAddress, buffer, count);
 }
 
-void CEC_LogicalDevice::OnTransmitComplete(bool success)
+void CEC_LogicalDevice::OnTransmitComplete(unsigned char* buffer, int count, bool ack)
 {
 	if (_primaryState == CEC_ALLOCATE_LOGICAL_ADDRESS &&
 		_secondaryState == CEC_RCV_POLLING_MESSAGE &&
 		_logicalAddress == CLA_UNREGISTERED)
 	{
-		while (!ProcessStateMachine(&success))
+		while (!ProcessStateMachine(&ack))
 			;
 	}
-        else
-          DbgPrint("Transmit: %d\n", success);
 }
 
 void CEC_LogicalDevice::Run()

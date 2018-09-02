@@ -20,6 +20,7 @@ protected:
 
   virtual void OnReady();
   virtual void OnReceiveComplete(unsigned char* buffer, int count, bool ack);
+  virtual void OnTransmitComplete(unsigned char* buffer, int count, bool ack);
 
 private:
 friend void XX_SetLineState(CEC_Device* device, bool state);

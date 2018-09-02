@@ -27,7 +27,7 @@ protected:
 
 	bool ProcessStateMachine(bool* success);
 
-	virtual void OnTransmitComplete(bool);
+	virtual void OnTransmitComplete(unsigned char* buffer, int count, bool ack);
 
 	virtual void OnReady() {;}
 
