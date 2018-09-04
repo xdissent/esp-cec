@@ -159,7 +159,8 @@ unsigned long CEC_Electrical::Process()
 		
 		case CEC_RCV_DATABIT1:
 		case CEC_RCV_EOM1:
-			// We've received the rising edge of the data/eom bit
+		case CEC_RCV_ACK1:
+			// We've received the rising edge of the data/eom/ack bit
 			bool bit;
 			if (difftime >= 400 && difftime <= 800)
 				bit = true;
@@ -172,13 +173,25 @@ unsigned long CEC_Electrical::Process()
 				waitTime = LineError();
 				break;
 			}
-			// Save the received bit
 			if (_secondaryState == CEC_RCV_EOM1)
 			{
 				_eom = bit;
 			}
+			else if (_secondaryState == CEC_RCV_ACK1)
+			{
+				bool ack = (bit == _broadcast);
+				if (_eom || !ack)
+				{
+					// We're not going to receive anything more from the initiator.
+					// Go back to the IDLE state and wait for another start bit.
+					ProcessFrame(ack);
+					waitTime = ResetState() ? micros() : (unsigned long)-1;
+					break;
+				}
+			}
 			else
 			{
+				// Save the received bit
 				unsigned int idx = _receiveBufferBits >> 3;
 				if (idx < sizeof(_receiveBuffer))
 				{
@@ -191,7 +204,8 @@ unsigned long CEC_Electrical::Process()
 
 		case CEC_RCV_DATABIT2:
 		case CEC_RCV_EOM2:
-			// We've received the falling edge of the data bit
+		case CEC_RCV_ACK2:
+			// We've received the falling edge of the data/eom/ack bit
 			if (difftime >= 2050 && difftime <= 2750)
 			{
 				_bitStartTime = time;
@@ -223,7 +237,8 @@ unsigned long CEC_Electrical::Process()
 					break;
 				}
 				// Receive another bit
-				_secondaryState = ((_receiveBufferBits & 7) == 0) ? CEC_RCV_EOM1 : CEC_RCV_DATABIT1;
+				_secondaryState = (_secondaryState == CEC_RCV_DATABIT2 &&
+				                   (_receiveBufferBits & 7) == 0) ? CEC_RCV_EOM1 : CEC_RCV_DATABIT1;
 				break;
 			}
 			// Illegal state.  Go back to CEC_IDLE to wait for a valid
@@ -248,48 +263,6 @@ unsigned long CEC_Electrical::Process()
 			// We need to wait for the falling edge of the ACK
 			// to finish processing this ack
 			_secondaryState = CEC_RCV_ACK2;
-			break;
-
-		case CEC_RCV_ACK1:
-			{
-				bool ack;
-				if (difftime >= 400 && difftime <= 800)
-					ack = _broadcast;
-				else if (difftime >= 1300 && difftime <= 1700)
-					ack = !_broadcast;
-				else
-				{
-					// Illegal state.  Go back to CEC_IDLE to wait for a valid
-					// start bit
-					waitTime = LineError();
-					break;
-				}
-
-				if (!_eom && ack)
-				{
-					// receive the rest of the ACK (or rather the beginning of the next bit)
-					_secondaryState = CEC_RCV_ACK2;
-					break;
-				}
-				// We're not going to receive anything more from
-				// the initiator (EOM has been received).  Go back
-				// to the IDLE state and wait for another start bit.
-				ProcessFrame(ack);
-				waitTime = ResetState() ? micros() : (unsigned long)-1;
-				break;
-			}
-
-		case CEC_RCV_ACK2:
-			// We're receiving the falling edge of the ack
-			if (difftime >= 2050 && difftime <= 2750)
-			{
-				_secondaryState = CEC_RCV_DATABIT1;
-				_bitStartTime = time;
-				break;
-			}
-			// Illegal state (or NACK).  Either way, go back to CEC_IDLE
-			// to wait for next start bit (maybe a retransmit)..
-			waitTime = LineError();
 			break;
 
 		case CEC_RCV_LINEERROR:
