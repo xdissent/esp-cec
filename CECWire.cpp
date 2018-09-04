@@ -62,7 +62,7 @@ unsigned long CEC_Electrical::LineError()
         DbgPrint("%p: Line Error!\n", this);
 	if (_follower || _broadcast)
 	{
-		_secondaryState = CEC_RCV_LINEERROR;
+		_state = CEC_RCV_LINEERROR;
 		Lower();
 		return micros() + 3600;
 	}
@@ -84,35 +84,43 @@ unsigned long CEC_Electrical::Process()
 	bool lastLineState = _lastLineState;
 	unsigned long waitTime = -1;	// INFINITE; (== wait until an external event has occurred)
 	unsigned long time = micros();
-
-	// If the state hasn't changed and we're not in a transmit
-	// state then this is spurrious.
-	if( currentLineState == lastLineState &&
-		!(_primaryState == CEC_TRANSMIT ||
-		  (_primaryState == CEC_RECEIVE &&
-		   (_secondaryState == CEC_RCV_ACK_SENT ||
-		    _secondaryState == CEC_RCV_LINEERROR))))
-		return waitTime;
-
 	unsigned long lasttime = _lastStateChangeTime;
 	unsigned long difftime = time - _bitStartTime;
+	bool bit;
 
 	if( currentLineState != lastLineState )
 	{
 		// Line state has changed, update our internal state
 		_lastLineState = currentLineState;
 		_lastStateChangeTime = time;
+
+		if (_state >= CEC_XMIT_WAIT && _state != CEC_XMIT_ACK_TEST && _state != CEC_XMIT_ACK_WAIT)
+		// We are in a transmit state and someone else is mucking with the line.  Wait for the
+		// line to clear before appropriately before (re)transmit
+		// However it is OK for a follower to ACK if we are in an ACK state
+		{
+			if (_state == CEC_XMIT_WAIT)
+			{
+				// If a state changed during transmit wait, someone else could be legitimately transmitting
+				_state = CEC_IDLE;
+			}
+			else
+			{
+				// Transmit collision
+				ResetTransmit(true);
+				waitTime = 0;
+			}
+		}
 	}
 
-	switch (_primaryState)
+	switch (_state)
 	{
 	case CEC_IDLE:
 		// If a high to low transition occurs, then we must be
 		// beginning a start bit
 		if (lastLineState && !currentLineState)
 		{
-			_primaryState = CEC_RECEIVE;
-			_secondaryState = CEC_RCV_STARTBIT1;
+			_state = CEC_RCV_STARTBIT1;
 			_bitStartTime = time;
 			_follower = false;
 			_broadcast = false;
@@ -124,16 +132,13 @@ unsigned long CEC_Electrical::Process()
 		// or we detect the falling edge of the start bit
 		break;
 
-	case CEC_RECEIVE:
-		switch (_secondaryState)
-		{
 		case CEC_RCV_STARTBIT1:
 			// We're waiting for the rising edge of the start bit
 			if (difftime >= (STARTBIT_TIME_LOW - BIT_TIME_LOW_MARGIN) &&
 			    difftime <= (STARTBIT_TIME_LOW + BIT_TIME_LOW_MARGIN))
 			{
 				// We now need to wait for the next falling edge
-				_secondaryState = CEC_RCV_STARTBIT2;
+				_state = CEC_RCV_STARTBIT2;
 				break;
 			}
 			// Illegal state.  Go back to CEC_IDLE to wait for a valid start bit
@@ -148,7 +153,7 @@ unsigned long CEC_Electrical::Process()
 			{
 				// We've fully received the start bit.  Begin receiving
 				// a data bit
-				_secondaryState = CEC_RCV_DATABIT1;
+				_state = CEC_RCV_DATABIT1;
 				_bitStartTime = time;
 				break;
 			}
@@ -161,7 +166,6 @@ unsigned long CEC_Electrical::Process()
 		case CEC_RCV_EOM1:
 		case CEC_RCV_ACK1:
 			// We've received the rising edge of the data/eom/ack bit
-			bool bit;
 			if (difftime >= (BIT_TIME_LOW_1 - BIT_TIME_LOW_MARGIN) &&
 			    difftime <= (BIT_TIME_LOW_1 + BIT_TIME_LOW_MARGIN))
 				bit = true;
@@ -174,11 +178,11 @@ unsigned long CEC_Electrical::Process()
 				waitTime = LineError();
 				break;
 			}
-			if (_secondaryState == CEC_RCV_EOM1)
+			if (_state == CEC_RCV_EOM1)
 			{
 				_eom = bit;
 			}
-			else if (_secondaryState == CEC_RCV_ACK1)
+			else if (_state == CEC_RCV_ACK1)
 			{
 				bool ack = (bit == _broadcast);
 				if (_eom || !ack)
@@ -200,7 +204,7 @@ unsigned long CEC_Electrical::Process()
 					_receiveBufferBits++;
 				}
 			}
-			_secondaryState = (CEC_SECONDARY_STATE)(_secondaryState + 1);
+			_state = (CEC_STATE)(_state + 1);
 			break;
 
 		case CEC_RCV_DATABIT2:
@@ -210,9 +214,9 @@ unsigned long CEC_Electrical::Process()
 			if (difftime >= (BIT_TIME - BIT_TIME_MARGIN) && difftime <= (BIT_TIME + BIT_TIME_MARGIN))
 			{
 				_bitStartTime = time;
-				if (_secondaryState == CEC_RCV_EOM2)
+				if (_state == CEC_RCV_EOM2)
 				{
-					_secondaryState = CEC_RCV_ACK1;
+					_state = CEC_RCV_ACK1;
 
 					// Check to see if the frame is addressed to us
 					// or if we are in promiscuous mode (in which case we'll receive everything)
@@ -226,8 +230,7 @@ unsigned long CEC_Electrical::Process()
 					if (_follower)
 					{
 						Lower();
-
-						_secondaryState = CEC_RCV_ACK_SENT;
+						_state = CEC_RCV_ACK_SENT;
 						waitTime = _bitStartTime + BIT_TIME_LOW_0;
 					}
 					else if (!Promiscuous && !_broadcast)
@@ -238,8 +241,8 @@ unsigned long CEC_Electrical::Process()
 					break;
 				}
 				// Receive another bit
-				_secondaryState = (_secondaryState == CEC_RCV_DATABIT2 &&
-				                   (_receiveBufferBits & 7) == 0) ? CEC_RCV_EOM1 : CEC_RCV_DATABIT1;
+				_state = (_state == CEC_RCV_DATABIT2 &&
+				          (_receiveBufferBits & 7) == 0) ? CEC_RCV_EOM1 : CEC_RCV_DATABIT1;
 				break;
 			}
 			// Illegal state.  Go back to CEC_IDLE to wait for a valid start bit
@@ -262,7 +265,7 @@ unsigned long CEC_Electrical::Process()
 			}
 			// We need to wait for the falling edge of the ACK
 			// to finish processing this ack
-			_secondaryState = CEC_RCV_ACK2;
+			_state = CEC_RCV_ACK2;
 			break;
 
 		case CEC_RCV_LINEERROR:
@@ -271,52 +274,12 @@ unsigned long CEC_Electrical::Process()
 			waitTime = ResetState() ? micros() : (unsigned long)-1;
 			break;
 		
-		}
-
-		break;
-
-	case CEC_TRANSMIT:
-		if (lastLineState != currentLineState)
-		{
-			// Someone else is mucking with the line.  Wait for the
-			// line to clear before appropriately before (re)transmit
-
-			// However it is OK for a follower to ACK if we are in an
-			// ACK state
-			if (_secondaryState != CEC_XMIT_ACK_TEST &&
-			    _secondaryState != CEC_XMIT_ACK_WAIT)
-			{
-				// If a state changed TO LOW during IDLE wait, someone could be legitimately transmitting
-				if (_secondaryState == CEC_IDLE_WAIT)
-				{
-					if (currentLineState == false)
-					{
-						_primaryState = CEC_RECEIVE;
-						_secondaryState = CEC_RCV_STARTBIT1;
-						_bitStartTime = time;
-						_transmitPending = true;
-					}
-					break;
-				}
-				else
-				{
-					// Transmit collision
-					ResetTransmit(true);
-					waitTime = 0;
-					break;
-				}
-			}
-		}
-
-		switch (_secondaryState)
-		{
-		case CEC_IDLE_WAIT:
+		case CEC_XMIT_WAIT:
 			// We need to wait a certain amount of time before we can
 			// transmit..
 
 			// If the line is low, we can't do anything now.  Wait
-			// indefinitely until a line state changes which will
-			// catch in the code just above
+			// indefinitely until a line state changes
 			if (currentLineState == 0)
 				break;
 			// The line is high.  Have we waited long enough?
@@ -336,7 +299,7 @@ unsigned long CEC_Electrical::Process()
 			_amLastTransmittor = true;
 			_broadcast = (_transmitBuffer[0] & 0x0f) == 0x0f;
 			waitTime = _bitStartTime + STARTBIT_TIME_LOW;
-			_secondaryState = CEC_XMIT_STARTBIT1;
+			_state = CEC_XMIT_STARTBIT1;
 			break;
 
 		case CEC_XMIT_STARTBIT1:
@@ -348,7 +311,7 @@ unsigned long CEC_Electrical::Process()
 				break;
 			}
 			waitTime = _bitStartTime + STARTBIT_TIME;
-			_secondaryState = CEC_XMIT_STARTBIT2;
+			_state = CEC_XMIT_STARTBIT2;
 			break;
 
 		case CEC_XMIT_DATABIT1:
@@ -361,7 +324,7 @@ unsigned long CEC_Electrical::Process()
 				break;
 			}
 			waitTime = _bitStartTime + BIT_TIME;
-			_secondaryState = (CEC_SECONDARY_STATE)(_secondaryState + 1);
+			_state = (CEC_STATE)(_state + 1);
 			break;
 
 		case CEC_XMIT_STARTBIT2:
@@ -371,21 +334,20 @@ unsigned long CEC_Electrical::Process()
 			// We finished the second half of the previous bit, send the falling edge of the new bit
 			Lower();
 			_bitStartTime = time;
-			bool bit;
-			if (_secondaryState == CEC_XMIT_DATABIT2 && (_transmitBufferBitIdx & 7) == 0)
+			if (_state == CEC_XMIT_DATABIT2 && (_transmitBufferBitIdx & 7) == 0)
 			{
-				_secondaryState = CEC_XMIT_EOM1;
+				_state = CEC_XMIT_EOM1;
 				// Get EOM bit: transmit buffer empty?
 				bit = _eom = (_transmitBufferBytes == (_transmitBufferBitIdx >> 3));
 			}
-			else if (_secondaryState == CEC_XMIT_EOM2)
+			else if (_state == CEC_XMIT_EOM2)
 			{
-				_secondaryState = CEC_XMIT_ACK1;
+				_state = CEC_XMIT_ACK1;
 				bit = true; // We transmit a '1'
 			}
 			else
 			{
-				_secondaryState = CEC_XMIT_DATABIT1;
+				_state = CEC_XMIT_DATABIT1;
 				// Pull bit from transmit buffer
 				unsigned char b = _transmitBuffer[_transmitBufferBitIdx >> 3] << (_transmitBufferBitIdx++ & 7);
 				bit = b >> 7;
@@ -397,7 +359,7 @@ unsigned long CEC_Electrical::Process()
 			// We finished the first half of the ack bit, release the line
 			Raise();                         // No check, maybe follower pulls low for ACK
 			waitTime = _bitStartTime + BIT_TIME_SAMPLE;
-			_secondaryState = CEC_XMIT_ACK_TEST;
+			_state = CEC_XMIT_ACK_TEST;
 			break;
 
 		case CEC_XMIT_ACK_TEST:
@@ -429,27 +391,25 @@ unsigned long CEC_Electrical::Process()
 				break;
 			}
 			// We have more to transmit, so do so...
-			_secondaryState = CEC_XMIT_ACK_WAIT; // wait for line going high
-			if (currentLineState != 0)           // already high, no ACK from follower
+			_state = CEC_XMIT_ACK_WAIT; // wait for line going high
+			if (currentLineState != 0)  // already high, no ACK from follower
 			{
 				waitTime = _bitStartTime + BIT_TIME;
-				_secondaryState = CEC_XMIT_ACK2;
+				_state = CEC_XMIT_ACK2;
 			}
 			break;
 		case CEC_XMIT_ACK_WAIT:
 			// We received the rising edge of ack from follower
 			waitTime = _bitStartTime + BIT_TIME;
-			_secondaryState = CEC_XMIT_ACK2;
+			_state = CEC_XMIT_ACK2;
 			break;
-		}
 	}
 	return waitTime;	
 }
 
 bool CEC_Electrical::ResetState()
 {
-	_primaryState = CEC_IDLE;
-	_secondaryState = (CEC_SECONDARY_STATE)0;
+	_state = CEC_IDLE;
 	_eom = false;
 	_follower = false;
 	_broadcast = false;
@@ -467,8 +427,7 @@ bool CEC_Electrical::ResetState()
 
 void CEC_Electrical::ResetTransmit(bool retransmit)
 {
-	_primaryState = CEC_TRANSMIT;
-	_secondaryState = CEC_IDLE_WAIT;
+	_state = CEC_XMIT_WAIT;
 	_transmitPending = false;
 
 	if (!retransmit)
@@ -507,7 +466,7 @@ bool CEC_Electrical::Transmit(int sourceAddress, int targetAddress, unsigned cha
 		_transmitBuffer[i+1] = buffer[i];
 	_transmitBufferBytes = count + 1;
 
-	if (_primaryState == CEC_IDLE)
+	if (_state == CEC_IDLE)
 		ResetTransmit(false);
 	else
 		_transmitPending = true;

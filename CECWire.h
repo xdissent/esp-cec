@@ -11,7 +11,7 @@ public:
 	void SetAddress(int address);
 
 	unsigned long Process();
-	bool TransmitPending() { return _primaryState == CEC_TRANSMIT && _secondaryState == CEC_IDLE_WAIT; }
+	bool TransmitPending() { return _state == CEC_XMIT_WAIT; }
 
 	int Promiscuous;
 	int MonitorMode;
@@ -26,11 +26,7 @@ protected:
 private:
 	typedef enum {
 		CEC_IDLE,
-		CEC_TRANSMIT,
-		CEC_RECEIVE,
-	} CEC_PRIMARY_STATE;
 
-	typedef enum {
 		CEC_RCV_STARTBIT1,
 		CEC_RCV_STARTBIT2,
 		CEC_RCV_DATABIT1,
@@ -42,7 +38,7 @@ private:
 		CEC_RCV_ACK2,
 		CEC_RCV_LINEERROR,
 
-		CEC_IDLE_WAIT,
+		CEC_XMIT_WAIT,
 		CEC_XMIT_STARTBIT1,
 		CEC_XMIT_STARTBIT2,
 		CEC_XMIT_DATABIT1,
@@ -53,7 +49,7 @@ private:
 		CEC_XMIT_ACK_TEST,
 		CEC_XMIT_ACK_WAIT,
 		CEC_XMIT_ACK2,
-	} CEC_SECONDARY_STATE;
+	} CEC_STATE;
 
 	enum {
 		STARTBIT_TIME_LOW   = 3700, // 3.7ms
@@ -100,8 +96,7 @@ private:
 	bool _amLastTransmittor;
 	bool _transmitPending;
 
-	CEC_PRIMARY_STATE _primaryState;
-	CEC_SECONDARY_STATE _secondaryState;
+	CEC_STATE _state;
 };
 
 
