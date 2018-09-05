@@ -1,15 +1,14 @@
 #include "CECWire.h"
 
-CEC_Electrical::CEC_Electrical(int address)
+CEC_Electrical::CEC_Electrical(int address) :
+	MonitorMode(false),
+	Promiscuous(false),
+	_address(address & 0x0f),
+	_state(CEC_IDLE),
+	_receiveBufferBits(0),
+	_transmitBufferBytes(0),
+	_amLastTransmittor(false)
 {
-	MonitorMode = false;
-	Promiscuous = false;
-
-	_address = address & 0x0f;
-	_state = CEC_IDLE;
-	_receiveBufferBits = 0;
-	_transmitBufferBytes = 0;
-	_amLastTransmittor = false;
 }
 
 void CEC_Electrical::Initialize()
