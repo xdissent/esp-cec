@@ -72,7 +72,7 @@ private:
 	unsigned int _transmitBufferBitIdx;
 
 	bool ResetState();
-	void ResetTransmit(bool retransmit);
+	void ResetTransmit();
 	void ProcessFrame(bool ack);
 
 	// Helper functions
@@ -94,7 +94,6 @@ private:
 	bool _follower;
 	bool _broadcast;
 	bool _amLastTransmittor;
-	bool _transmitPending;
 
 	CEC_STATE _state;
 };

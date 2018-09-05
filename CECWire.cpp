@@ -6,10 +6,10 @@ CEC_Electrical::CEC_Electrical(int address)
 	Promiscuous = false;
 
 	_address = address & 0x0f;
+	_state = CEC_IDLE;
+	_receiveBufferBits = 0;
+	_transmitBufferBytes = 0;
 	_amLastTransmittor = false;
-	_transmitPending = false;
-	_xmitretry = 0;
-	ResetState();
 }
 
 void CEC_Electrical::Initialize()
@@ -107,7 +107,7 @@ unsigned long CEC_Electrical::Process()
 			else
 			{
 				// Transmit collision
-				ResetTransmit(true);
+				ResetTransmit();
 				waitTime = 0;
 			}
 		}
@@ -296,6 +296,7 @@ unsigned long CEC_Electrical::Process()
 			// we've wait long enough, begin start bit
 			Lower();
 			_bitStartTime = time;
+			_transmitBufferBitIdx = 0;
 			_amLastTransmittor = true;
 			_broadcast = (_transmitBuffer[0] & 0x0f) == 0x0f;
 			waitTime = _bitStartTime + STARTBIT_TIME_LOW;
@@ -307,7 +308,7 @@ unsigned long CEC_Electrical::Process()
 			if (!Raise())
 			{
 				//DbgPrint("%p: Received Line Error\n", this);
-				ResetTransmit(true);
+				ResetTransmit();
 				break;
 			}
 			waitTime = _bitStartTime + STARTBIT_TIME;
@@ -320,7 +321,7 @@ unsigned long CEC_Electrical::Process()
 			if (!Raise())
 			{
 				//DbgPrint("%p: Received Line Error\n", this);
-				ResetTransmit(true);
+				ResetTransmit();
 				break;
 			}
 			waitTime = _bitStartTime + BIT_TIME;
@@ -374,11 +375,12 @@ unsigned long CEC_Electrical::Process()
 				// acknowledgement that it has succeeded or failed
 				if (_transmitBufferBytes == 1)
 				{
-					ResetState();
+					_transmitBufferBytes = 0;
+					_state = CEC_IDLE;
 				}
 				else
 				{
-					ResetTransmit(true);
+					ResetTransmit();
 					waitTime = 0;
 				}
 				break;
@@ -388,7 +390,8 @@ unsigned long CEC_Electrical::Process()
 			{
 				// Nothing left to transmit, go back to idle
 				OnTransmitComplete(_transmitBuffer, _transmitBufferBitIdx >> 3, true);
-				ResetState();
+				_transmitBufferBytes = 0;
+				_state = CEC_IDLE;
 				break;
 			}
 			// We have more to transmit, so do so...
@@ -410,39 +413,28 @@ unsigned long CEC_Electrical::Process()
 
 bool CEC_Electrical::ResetState()
 {
-	_state = CEC_IDLE;
-	_eom = false;
-	_follower = false;
-	_broadcast = false;
-	_receiveBufferBits = 0;
-	_transmitBufferBytes = 0;
-	_transmitBufferBitIdx = 0;
-
-	if (_transmitPending)
+	if (_transmitBufferBytes != 0)
         {
-		ResetTransmit(false);
+	        _state = CEC_XMIT_WAIT;
                 return true;
         }
+	_state = CEC_IDLE;
         return false;
 }
 
-void CEC_Electrical::ResetTransmit(bool retransmit)
+void CEC_Electrical::ResetTransmit()
 {
-	_state = CEC_XMIT_WAIT;
-	_transmitPending = false;
-
-	if (!retransmit)
-		_xmitretry = 0;
-	else if (++_xmitretry == CEC_MAX_RETRANSMIT)
-		{
-			// No more
-			ResetState();
-		}
-		else
-		{
-			//DbgPrint("%p: Retransmitting current frame\n", this);
-			_transmitBufferBitIdx = 0;
-		}
+	if (++_xmitretry == CEC_MAX_RETRANSMIT)
+	{
+		// No more
+		_transmitBufferBytes = 0;
+		_state = CEC_IDLE;
+	}
+	else
+	{
+		// Retransmit
+		_state = CEC_XMIT_WAIT;
+	}
 }
 
 void CEC_Electrical::ProcessFrame(bool ack)
@@ -465,10 +457,9 @@ bool CEC_Electrical::Transmit(int sourceAddress, int targetAddress, unsigned cha
 	for (int i = 0; i < count; i++)
 		_transmitBuffer[i+1] = buffer[i];
 	_transmitBufferBytes = count + 1;
+	_xmitretry = 0;
 
 	if (_state == CEC_IDLE)
-		ResetTransmit(false);
-	else
-		_transmitPending = true;
+		_state = CEC_XMIT_WAIT;
 	return true;
 }
