@@ -367,12 +367,13 @@ unsigned long CEC_Electrical::Process()
 			if ((currentLineState != 0) != _broadcast)
 			{
 				// not being acknowledged
+				OnTransmitComplete(_transmitBuffer, _transmitBufferBitIdx >> 3, false);
+
 				// normally we retransmit.  But this is NOT the case for <Polling Message> as its
 				// function is basically to 'ping' a logical address in which case we just want 
 				// acknowledgement that it has succeeded or failed
 				if (_transmitBufferBytes == 1)
 				{
-					OnTransmitComplete(_transmitBuffer, _transmitBufferBitIdx >> 3, false);
 					ResetState();
 				}
 				else
@@ -435,7 +436,6 @@ void CEC_Electrical::ResetTransmit(bool retransmit)
 	else if (++_xmitretry == CEC_MAX_RETRANSMIT)
 		{
 			// No more
-			OnTransmitComplete(_transmitBuffer, _transmitBufferBitIdx >> 3, false);
 			ResetState();
 		}
 		else
