@@ -56,18 +56,6 @@ bool CEC_Electrical::Lower()
 	return true;
 }
 
-unsigned long CEC_Electrical::LineError()
-{
-        DbgPrint("%p: Line Error!\n", this);
-	if (_follower || _broadcast)
-	{
-		_state = CEC_RCV_LINEERROR;
-		Lower();
-		return micros() + 3600;
-	}
-	return ResetState() ? micros() : (unsigned long)-1;
-}
-
 ///
 /// CEC_Electrical::Process implements our main state machine
 /// which includes all reading and writing of state including
@@ -121,6 +109,7 @@ unsigned long CEC_Electrical::Process()
 		{
 			_state = CEC_RCV_STARTBIT1;
 			_bitStartTime = time;
+			_ack = true;
 			_follower = false;
 			_broadcast = false;
 			_amLastTransmittor = false;
@@ -141,14 +130,12 @@ unsigned long CEC_Electrical::Process()
 				break;
 			}
 			// Illegal state.  Go back to CEC_IDLE to wait for a valid start bit
-//DbgPrint("1: %ld %ld\n", difftime, micros());
-			waitTime = ResetState() ? micros() : (unsigned long)-1;
+			waitTime = ResetState() ? 0 : (unsigned long)-1;
 			break;
 		
 		case CEC_RCV_STARTBIT2:
 			// This should be the falling edge of the start bit
-			if (difftime >= (STARTBIT_TIME - BIT_TIME_LOW_MARGIN) &&
-			    difftime <= (STARTBIT_TIME + BIT_TIME_LOW_MARGIN))
+			if (difftime >= (STARTBIT_TIME - BIT_TIME_LOW_MARGIN))
 			{
 				// We've fully received the start bit.  Begin receiving
 				// a data bit
@@ -157,8 +144,7 @@ unsigned long CEC_Electrical::Process()
 				break;
 			}
 			// Illegal state.  Go back to CEC_IDLE to wait for a valid start bit
-//DbgPrint("2: %ld %ld\n", difftime, micros());
-			waitTime = ResetState() ? micros() : (unsigned long)-1;
+			waitTime = ResetState() ? 0 : (unsigned long)-1;
 			break;
 		
 		case CEC_RCV_DATABIT1:
@@ -173,9 +159,9 @@ unsigned long CEC_Electrical::Process()
 				bit = false;
 			else
 			{
-				// Illegal state.  Go back to CEC_IDLE to wait for a valid start bit
-				waitTime = LineError();
-				break;
+				// Illegal state.  Send NAK later.
+				bit = true;
+				_ack = false;
 			}
 			if (_state == CEC_RCV_EOM1)
 			{
@@ -183,13 +169,13 @@ unsigned long CEC_Electrical::Process()
 			}
 			else if (_state == CEC_RCV_ACK1)
 			{
-				bool ack = (bit == _broadcast);
-				if (_eom || !ack)
+				_ack = (bit == _broadcast);
+				if (_eom || !_ack)
 				{
 					// We're not going to receive anything more from the initiator.
 					// Go back to the IDLE state and wait for another start bit.
-					ProcessFrame(ack);
-					waitTime = ResetState() ? micros() : (unsigned long)-1;
+					ProcessFrame(_ack);
+					waitTime = ResetState() ? 0 : (unsigned long)-1;
 					break;
 				}
 			}
@@ -210,7 +196,7 @@ unsigned long CEC_Electrical::Process()
 		case CEC_RCV_EOM2:
 		case CEC_RCV_ACK2:
 			// We've received the falling edge of the data/eom/ack bit
-			if (difftime >= (BIT_TIME - BIT_TIME_MARGIN) && difftime <= (BIT_TIME + BIT_TIME_MARGIN))
+			if (difftime >= (BIT_TIME - BIT_TIME_MARGIN))
 			{
 				_bitStartTime = time;
 				if (_state == CEC_RCV_EOM2)
@@ -225,17 +211,17 @@ unsigned long CEC_Electrical::Process()
 					else if (address == _address)
 						_follower = true;
 
-					// If we're the follower, go low for a while
-					if (_follower)
+					// Go low for ack/nak
+					if ((_follower && _ack) || (_broadcast && !_ack))
 					{
 						Lower();
 						_state = CEC_RCV_ACK_SENT;
 						waitTime = _bitStartTime + BIT_TIME_LOW_0;
 					}
-					else if (!Promiscuous && !_broadcast)
+					else if (!_ack || (!Promiscuous && !_broadcast))
 					{
-						// It's not addressed to us.  Reset and wait for the next start bit
-						waitTime = ResetState() ? micros() : (unsigned long)-1;
+						// It's broken or not addressed to us.  Reset and wait for the next start bit
+						waitTime = ResetState() ? 0 : (unsigned long)-1;
 					}
 					break;
 				}
@@ -244,22 +230,24 @@ unsigned long CEC_Electrical::Process()
 				          (_receiveBufferBits & 7) == 0) ? CEC_RCV_EOM1 : CEC_RCV_DATABIT1;
 				break;
 			}
-			// Illegal state.  Go back to CEC_IDLE to wait for a valid start bit
-			waitTime = LineError();
+			// Line error.
+			Lower();
+			_state = CEC_RCV_LINEERROR;
+			waitTime = time + BIT_TIME_ERR;
 			break;
 
 		case CEC_RCV_ACK_SENT:
 			// We're done holding the line low...  release it
 			Raise();
-			if (_eom)
+			if (_eom || !_ack)
 			{
 				// We're not going to receive anything more from
 				// the initiator (EOM has been received)
-				// And we've sent the ACK for the most recent bit
+				// or we've sent the NAK for the most recent bit
 				// therefore this message is all done.  Go back
 				// to the IDLE state and wait for another start bit.
-				ProcessFrame(true);
-			        waitTime = ResetState() ? micros() : (unsigned long)-1;
+				ProcessFrame(_ack);
+			        waitTime = ResetState() ? 0 : (unsigned long)-1;
 				break;
 			}
 			// We need to wait for the falling edge of the ACK
@@ -268,9 +256,8 @@ unsigned long CEC_Electrical::Process()
 			break;
 
 		case CEC_RCV_LINEERROR:
-			//DbgPrint("%p: Done signaling line error\n", this);
 			Raise();
-			waitTime = ResetState() ? micros() : (unsigned long)-1;
+			waitTime = ResetState() ? 0 : (unsigned long)-1;
 			break;
 		
 		case CEC_XMIT_WAIT:

@@ -58,6 +58,7 @@ private:
 		BIT_TIME_LOW_1      =  600, // 0.6ms
 		BIT_TIME_SAMPLE     = 1050, // 1.05ms
 		BIT_TIME            = 2400, // 2.4ms
+		BIT_TIME_ERR        = 3600, // 3.6ms
 		BIT_TIME_LOW_MARGIN =  300, // 0.2ms  plus some additional margin since we poll the bitline
 		BIT_TIME_MARGIN     =  450, // 0.35ms plus some additional margin since we poll the bitline
 	};
@@ -78,7 +79,6 @@ private:
 	// Helper functions
 	bool Raise();
 	bool Lower();
-	unsigned long LineError();
 
 	int _address;
 	bool _lastLineState;
@@ -91,6 +91,7 @@ private:
 	};
 
 	bool _eom;
+	bool _ack;
 	bool _follower;
 	bool _broadcast;
 	bool _amLastTransmittor;
