@@ -6,14 +6,14 @@
 class CEC_Electrical
 {
 public:
-	CEC_Electrical(int address);
+	CEC_Electrical();
 	virtual void Run();
-	void SetAddress(int address);
 
 	int Promiscuous;
 	int MonitorMode;
 
 protected:
+	int _logicalAddress;
 	virtual bool LineState() = 0;
 	virtual void SetLineState(bool) = 0;
 	virtual void OnTransmitComplete(unsigned char* buffer, int count, bool ack) = 0;
@@ -76,7 +76,6 @@ private:
 	bool Raise();
 	bool Lower();
 
-	int _address;
 	bool _lastLineState;
 	unsigned long _bitStartTime;
 	unsigned long _waitTime;

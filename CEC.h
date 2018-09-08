@@ -65,7 +65,6 @@ private:
 
 private:
 	static int _validLogicalAddresses[6][5];
-	int _logicalAddress;
 	int _physicalAddress;
 	bool _done;
 

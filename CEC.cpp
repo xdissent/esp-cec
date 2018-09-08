@@ -10,9 +10,8 @@ int CEC_LogicalDevice::_validLogicalAddresses[6][5] =
 		};
 
 CEC_LogicalDevice::CEC_LogicalDevice(int physicalAddress)
-: CEC_Electrical(CLA_UNREGISTERED)
+: CEC_Electrical()
 , _physicalAddress(physicalAddress)
-, _logicalAddress(CLA_UNREGISTERED)
 , _done(false)
 , _primaryState(CEC_ALLOCATE_LOGICAL_ADDRESS)
 , _deviceType(CDT_OTHER)
@@ -69,7 +68,6 @@ bool CEC_LogicalDevice::ProcessStateMachine(bool* success)
 				{
 					// We hereby claim this as our logical address!
 					_logicalAddress = _validLogicalAddresses[_deviceType][_tertiaryState];
-					SetAddress(_logicalAddress);
 					DbgPrint("Logical address assigned: %d\n", _logicalAddress);
 					_primaryState = CEC_READY;
 				}

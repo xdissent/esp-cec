@@ -1,9 +1,9 @@
 #include "CECWire.h"
 
-CEC_Electrical::CEC_Electrical(int address) :
+CEC_Electrical::CEC_Electrical() :
 	MonitorMode(false),
 	Promiscuous(false),
-	_address(address & 0x0f),
+	_logicalAddress(0xf),
 	_state(CEC_IDLE),
 	_receiveBufferBits(0),
 	_transmitBufferBytes(0),
@@ -11,11 +11,6 @@ CEC_Electrical::CEC_Electrical(int address) :
 	_bitStartTime(0),
 	_waitTime(0)
 {
-}
-
-void CEC_Electrical::SetAddress(int address)
-{
-	_address = address & 0x0f;
 }
 
 bool CEC_Electrical::Raise()
@@ -190,7 +185,7 @@ unsigned long CEC_Electrical::Process()
 					int address = _receiveBuffer[0] & 0x0f;
 					if (address == 0x0f)
 						_broadcast = true;
-					else if (address == _address)
+					else if (address == _logicalAddress)
 						_follower = true;
 
 					// Go low for ack/nak
