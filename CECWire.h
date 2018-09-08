@@ -71,7 +71,7 @@ private:
 
 	bool _lastLineState;
 	unsigned long _bitStartTime;
-	unsigned long _waitTime;
+	unsigned int _waitTime;
 
 	int _xmitretry;
 	enum {

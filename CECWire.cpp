@@ -23,9 +23,10 @@ void CEC_Electrical::Run()
 {
 	bool currentLineState = LineState();
 	unsigned long time = micros();
+	unsigned long difftime = time - _bitStartTime;
 	if (currentLineState == _lastLineState &&
-	    ((_waitTime == (unsigned long)-1 && _state != CEC_IDLE && _state != CEC_XMIT_WAIT) ||
-	     (_waitTime != (unsigned long)-1 && _waitTime > time)))
+	    ((_waitTime == (unsigned int)-1 && _state != CEC_IDLE && _state != CEC_XMIT_WAIT) ||
+	     (_waitTime != (unsigned int)-1 && _waitTime > difftime)))
 		return;
 
 	if (currentLineState != _lastLineState &&
@@ -35,9 +36,8 @@ void CEC_Electrical::Run()
 		// However it is OK for a follower to ACK if we are in an ACK state
 			_state = CEC_IDLE;
 
-	unsigned long difftime = time - _bitStartTime;
 	bool bit;
-	_waitTime = -1;	// INFINITE by default; (== wait until an external event has occurred)
+	_waitTime = (unsigned int)-1;	// INFINITE by default; (== wait until an external event has occurred)
 	switch (_state)
 	{
 	case CEC_IDLE:
@@ -142,9 +142,9 @@ void CEC_Electrical::Run()
 		case CEC_RCV_EOM2:
 		case CEC_RCV_ACK2:
 			// We've received the falling edge of the data/eom/ack bit
+			_bitStartTime = time;
 			if (difftime >= (BIT_TIME - BIT_TIME_MARGIN))
 			{
-				_bitStartTime = time;
 				if (_state == CEC_RCV_EOM2)
 				{
 					_state = CEC_RCV_ACK1;
@@ -163,7 +163,7 @@ void CEC_Electrical::Run()
 						if (!MonitorMode)
 							SetLineState(0);
 						_state = CEC_RCV_ACK_SENT;
-						_waitTime = _bitStartTime + BIT_TIME_LOW_0;
+						_waitTime = BIT_TIME_LOW_0;
 					}
 					else if (!_ack || (!Promiscuous && !_broadcast))
 					{
@@ -179,10 +179,14 @@ void CEC_Electrical::Run()
 				break;
 			}
 			// Line error.
-			if (!MonitorMode)
-				SetLineState(0);
+			if (MonitorMode)
+			{
+				_state = CEC_IDLE;
+				break;
+			}
+			SetLineState(0);
 			_state = CEC_RCV_LINEERROR;
-			_waitTime = time + BIT_TIME_ERR;
+			_waitTime = BIT_TIME_ERR;
 			break;
 
 		case CEC_RCV_ACK_SENT:
@@ -215,24 +219,21 @@ void CEC_Electrical::Run()
 			if (currentLineState == 0)
 				break;
 			// The line is high.  Have we waited long enough?
-			unsigned long neededIdleTime;
+			unsigned int neededIdleTime;
 			neededIdleTime = ((_xmitretry) ?  3 * BIT_TIME :
 			                  (_amLastTransmittor) ? 7 * BIT_TIME :
 			                  5 * BIT_TIME);
-			if (time - _bitStartTime < neededIdleTime)
+			if (difftime >= neededIdleTime)
 			{
-				// not waited long enough, wait some more!
-				_waitTime = _bitStartTime + neededIdleTime;
-				break;
+				// we've wait long enough, begin start bit
+				SetLineState(0);
+				_bitStartTime = time;
+				_transmitBufferBitIdx = 0;
+				_amLastTransmittor = true;
+				_broadcast = (_transmitBuffer[0] & 0x0f) == 0x0f;
+				_waitTime = STARTBIT_TIME_LOW;
+				_state = CEC_XMIT_STARTBIT1;
 			}
-			// we've wait long enough, begin start bit
-			SetLineState(0);
-			_bitStartTime = time;
-			_transmitBufferBitIdx = 0;
-			_amLastTransmittor = true;
-			_broadcast = (_transmitBuffer[0] & 0x0f) == 0x0f;
-			_waitTime = _bitStartTime + STARTBIT_TIME_LOW;
-			_state = CEC_XMIT_STARTBIT1;
 			break;
 
 		case CEC_XMIT_STARTBIT1:
@@ -246,7 +247,7 @@ void CEC_Electrical::Run()
 				_state = CEC_IDLE;
 				break;
 			}
-			_waitTime = _bitStartTime + ((_state == CEC_XMIT_STARTBIT1) ? STARTBIT_TIME : BIT_TIME);
+			_waitTime = (_state == CEC_XMIT_STARTBIT1) ? STARTBIT_TIME : BIT_TIME;
 			_state = (CEC_STATE)(_state + 1);
 			break;
 
@@ -275,13 +276,13 @@ void CEC_Electrical::Run()
 				unsigned char b = _transmitBuffer[_transmitBufferBitIdx >> 3] << (_transmitBufferBitIdx++ & 7);
 				bit = b >> 7;
 			}
-			_waitTime = _bitStartTime + (bit ? BIT_TIME_LOW_1 : BIT_TIME_LOW_0);
+			_waitTime = bit ? BIT_TIME_LOW_1 : BIT_TIME_LOW_0;
 			break;
 
 		case CEC_XMIT_ACK1:
 			// We finished the first half of the ack bit, release the line
 			SetLineState(1); // No check, maybe follower pulls low for ACK
-			_waitTime = _bitStartTime + BIT_TIME_SAMPLE;
+			_waitTime = BIT_TIME_SAMPLE;
 			_state = CEC_XMIT_ACK_TEST;
 			break;
 
@@ -311,13 +312,13 @@ void CEC_Electrical::Run()
 			_state = CEC_XMIT_ACK_WAIT; // wait for line going high
 			if (currentLineState != 0)  // already high, no ACK from follower
 			{
-				_waitTime = _bitStartTime + BIT_TIME;
+				_waitTime = BIT_TIME;
 				_state = CEC_XMIT_ACK2;
 			}
 			break;
 		case CEC_XMIT_ACK_WAIT:
 			// We received the rising edge of ack from follower
-			_waitTime = _bitStartTime + BIT_TIME;
+			_waitTime = BIT_TIME;
 			_state = CEC_XMIT_ACK2;
 			break;
 	}
