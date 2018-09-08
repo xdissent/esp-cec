@@ -8,7 +8,6 @@ class CEC_Electrical
 public:
 	CEC_Electrical(int address);
 	virtual void Run();
-	void Initialize();
 	void SetAddress(int address);
 
 	int Promiscuous;
@@ -79,7 +78,6 @@ private:
 
 	int _address;
 	bool _lastLineState;
-	unsigned long _lastStateChangeTime;
 	unsigned long _bitStartTime;
 	unsigned long _waitTime;
 

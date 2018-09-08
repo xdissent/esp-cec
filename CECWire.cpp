@@ -8,14 +8,9 @@ CEC_Electrical::CEC_Electrical(int address) :
 	_receiveBufferBits(0),
 	_transmitBufferBytes(0),
 	_amLastTransmittor(false),
+	_bitStartTime(0),
 	_waitTime(0)
 {
-}
-
-void CEC_Electrical::Initialize()
-{
-	_lastLineState = LineState();
-	_lastStateChangeTime = micros();
 }
 
 void CEC_Electrical::SetAddress(int address)
@@ -25,16 +20,11 @@ void CEC_Electrical::SetAddress(int address)
 
 bool CEC_Electrical::Raise()
 {
-	if (MonitorMode)
-		return LineState();
-
-	unsigned long time = micros();
 	SetLineState(1);
 	// Only update state if the line was actually changed (i.e. it wasn't already in its new state)
 	if (LineState())
 	{
 		_lastLineState = true;
-		_lastStateChangeTime = time;
 		return true;
 	}
 	return false;
@@ -45,13 +35,11 @@ bool CEC_Electrical::Lower()
 	if (MonitorMode)
 		return LineState();
 
-	unsigned long time = micros();
 	SetLineState(0);
 	// Only update state if the line was actually changed (i.e. it wasn't already in its new state)
 	if (!LineState())
 	{
 		_lastLineState = false;
-		_lastStateChangeTime = time;
 		return false;
 	}
 	return true;
@@ -72,15 +60,13 @@ unsigned long CEC_Electrical::Process()
 	bool lastLineState = _lastLineState;
 	unsigned long waitTime = -1;	// INFINITE; (== wait until an external event has occurred)
 	unsigned long time = micros();
-	unsigned long lasttime = _lastStateChangeTime;
 	unsigned long difftime = time - _bitStartTime;
 	bool bit;
 
-	if( currentLineState != lastLineState )
+	if (currentLineState != lastLineState)
 	{
 		// Line state has changed, update our internal state
 		_lastLineState = currentLineState;
-		_lastStateChangeTime = time;
 
 		if (_state >= CEC_XMIT_WAIT && _state != CEC_XMIT_ACK_TEST && _state != CEC_XMIT_ACK_WAIT)
 		// We are in a transmit state and someone else is mucking with the line.  Wait for the
@@ -267,10 +253,10 @@ unsigned long CEC_Electrical::Process()
 			neededIdleTime = ((_xmitretry) ?  3 * BIT_TIME :
 			                  (_amLastTransmittor) ? 7 * BIT_TIME :
 			                  5 * BIT_TIME);
-			if (time - _lastStateChangeTime < neededIdleTime)
+			if (time - _bitStartTime < neededIdleTime)
 			{
 				// not waited long enough, wait some more!
-				waitTime = lasttime + neededIdleTime;
+				waitTime = _bitStartTime + neededIdleTime;
 				break;
 			}
 			// we've wait long enough, begin start bit
@@ -333,7 +319,6 @@ unsigned long CEC_Electrical::Process()
 			break;
 
 		case CEC_XMIT_ACK_TEST:
-			//DbgPrint("%p: Testing ack: %d\n", this, (currentLineState == 0) != _broadcast?1:0);
 			if ((currentLineState != 0) != _broadcast)
 			{
 				// not being acknowledged
@@ -347,7 +332,6 @@ unsigned long CEC_Electrical::Process()
 				_state = CEC_IDLE;
 				break;
 			}
-			_lastStateChangeTime = lasttime;
 			if (_eom)
 			{
 				// Nothing left to transmit, go back to idle

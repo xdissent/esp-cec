@@ -23,7 +23,6 @@ CEC_LogicalDevice::CEC_LogicalDevice(int physicalAddress)
 
 void CEC_LogicalDevice::Initialize(CEC_DEVICE_TYPE type)
 {
-	CEC_Electrical::Initialize();
 	_deviceType = type;
 
         if (MonitorMode)
