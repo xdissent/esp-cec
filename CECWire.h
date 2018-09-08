@@ -11,9 +11,6 @@ public:
 	void Initialize();
 	void SetAddress(int address);
 
-	unsigned long Process();
-	bool TransmitPending() { return _state == CEC_XMIT_WAIT; }
-
 	int Promiscuous;
 	int MonitorMode;
 
@@ -73,8 +70,7 @@ private:
 	unsigned int _transmitBufferBytes;
 	unsigned int _transmitBufferBitIdx;
 
-	bool ResetState();
-	void ResetTransmit();
+	unsigned long Process();
 	void ProcessFrame(bool ack);
 
 	// Helper functions
