@@ -284,17 +284,6 @@ unsigned long CEC_Electrical::Process()
 			break;
 
 		case CEC_XMIT_STARTBIT1:
-			// We're at start bit low, send the rising edge of the start bit
-			if (!Raise())
-			{
-				// Error, start retransmit
-				_state = CEC_IDLE;
-				break;
-			}
-			waitTime = _bitStartTime + STARTBIT_TIME;
-			_state = CEC_XMIT_STARTBIT2;
-			break;
-
 		case CEC_XMIT_DATABIT1:
 		case CEC_XMIT_EOM1:
 			// We finished the first half of the bit, send the rising edge
@@ -304,7 +293,7 @@ unsigned long CEC_Electrical::Process()
 				_state = CEC_IDLE;
 				break;
 			}
-			waitTime = _bitStartTime + BIT_TIME;
+			waitTime = _bitStartTime + ((_state == CEC_XMIT_STARTBIT1) ? STARTBIT_TIME : BIT_TIME);
 			_state = (CEC_STATE)(_state + 1);
 			break;
 
