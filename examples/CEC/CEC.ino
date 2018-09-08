@@ -41,7 +41,6 @@ void XX_SetLineState(CEC_Device* device, bool state)
   // give enough time for the line to settle before sampling
   // it
   delayMicroseconds(50);
-  device->_lastLineState2 = XX_GetLineState();
 }
 
 void setup()

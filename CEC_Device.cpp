@@ -5,8 +5,6 @@ void XX_SetLineState(CEC_Device* device, bool state);
 
 CEC_Device::CEC_Device(int physicalAddress)
 : CEC_LogicalDevice(physicalAddress)
-, _isrTriggered(false)
-, _lastLineState2(true)
 {
 }
 
@@ -54,31 +52,4 @@ bool CEC_Device::LineState()
 void CEC_Device::SetLineState(bool state)
 {
   XX_SetLineState(this, state);
-}
-
-void CEC_Device::SignalIRQ()
-{
-  // This is called when the line has changed state
-  _isrTriggered = true;
-}
-
-bool CEC_Device::IsISRTriggered()
-{
-  if (_isrTriggered)
-  {
-    _isrTriggered = false;
-    return true;
-  }
-  return false;
-}
-
-void CEC_Device::Run()
-{
-  bool state = XX_GetLineState();
-  if (_lastLineState2 != state)
-  {
-    _lastLineState2 = state;
-    SignalIRQ();
-  }
-  CEC_LogicalDevice::Run();
 }

@@ -14,7 +14,6 @@ CEC_LogicalDevice::CEC_LogicalDevice(int physicalAddress)
 , _physicalAddress(physicalAddress)
 , _logicalAddress(CLA_UNREGISTERED)
 , _done(false)
-, _waitTime(0)
 , _primaryState(CEC_ALLOCATE_LOGICAL_ADDRESS)
 , _deviceType(CDT_OTHER)
 {
@@ -121,11 +120,5 @@ void CEC_LogicalDevice::Run()
 	while (!ProcessStateMachine(NULL))
 		;
 
-	if (((_waitTime == (unsigned long)-1 && !TransmitPending()) || (_waitTime != (unsigned long)-1 && _waitTime > micros())) && !IsISRTriggered())
-		return;
-
-        _waitTime = Process();
-	return;
+	CEC_Electrical::Run();
 }
-
-

@@ -7,7 +7,8 @@ CEC_Electrical::CEC_Electrical(int address) :
 	_state(CEC_IDLE),
 	_receiveBufferBits(0),
 	_transmitBufferBytes(0),
-	_amLastTransmittor(false)
+	_amLastTransmittor(false),
+	_waitTime(0)
 {
 }
 
@@ -448,4 +449,13 @@ bool CEC_Electrical::Transmit(int sourceAddress, int targetAddress, unsigned cha
 	if (_state == CEC_IDLE)
 		_state = CEC_XMIT_WAIT;
 	return true;
+}
+
+void CEC_Electrical::Run()
+{
+	if (((_waitTime == (unsigned long)-1 && !TransmitPending()) ||
+	     (_waitTime != (unsigned long)-1 && _waitTime > micros())) && LineState() == _lastLineState)
+		return;
+
+        _waitTime = Process();
 }

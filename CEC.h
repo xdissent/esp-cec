@@ -23,8 +23,6 @@ public:
 	virtual bool TransmitFrame(int targetAddress, unsigned char* buffer, int count);
 
 protected:
-	virtual bool IsISRTriggered() = 0;
-
 	bool ProcessStateMachine(bool* success);
 
 	virtual void OnTransmitComplete(unsigned char* buffer, int count, bool ack);
@@ -69,7 +67,6 @@ private:
 	static int _validLogicalAddresses[6][5];
 	int _logicalAddress;
 	int _physicalAddress;
-	unsigned long _waitTime;
 	bool _done;
 
 	CEC_DEVICE_TYPE _deviceType;
