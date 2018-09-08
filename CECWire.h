@@ -7,7 +7,7 @@ class CEC_Electrical
 {
 public:
 	CEC_Electrical();
-	virtual void Run();
+	void Run();
 
 	int Promiscuous;
 	int MonitorMode;
@@ -68,13 +68,6 @@ private:
 	unsigned char _transmitBuffer[16];
 	unsigned int _transmitBufferBytes;
 	unsigned int _transmitBufferBitIdx;
-
-	unsigned long Process();
-	void ProcessFrame(bool ack);
-
-	// Helper functions
-	bool Raise();
-	bool Lower();
 
 	bool _lastLineState;
 	unsigned long _bitStartTime;

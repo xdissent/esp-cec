@@ -18,9 +18,8 @@ public:
 public:
 	CEC_LogicalDevice(int physicalAddress);
 	void Initialize(CEC_DEVICE_TYPE type);
-
-	virtual void Run();
-	virtual bool TransmitFrame(int targetAddress, unsigned char* buffer, int count);
+	void Run();
+	bool TransmitFrame(int targetAddress, unsigned char* buffer, int count);
 
 protected:
 	bool ProcessStateMachine(bool* success);
