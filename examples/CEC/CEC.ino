@@ -1,4 +1,4 @@
-#include "CEC_Device.h"
+#include "CECWire.h"
 
 // NodeMCU ESP8266 Pins   bootstrap
 // D0  GPIO16  DeepSleep  blue LED connected to 3V3
@@ -21,27 +21,68 @@
 
 #define CEC_GPIO 5
 
-CEC_Device device;
-
-bool XX_GetLineState()
+// implement application specific CEC device
+class MyCEC_Device : public CEC_Electrical
 {
-  int state = digitalRead(CEC_GPIO);
-  return state != LOW;
+protected:
+	virtual bool LineState();
+	virtual void SetLineState(bool);
+	virtual void OnReady(int logicalAddress);
+	virtual void OnReceiveComplete(unsigned char* buffer, int count, bool ack);
+	virtual void OnTransmitComplete(unsigned char* buffer, int count, bool ack);
+};
+
+bool MyCEC_Device::LineState()
+{
+	int state = digitalRead(CEC_GPIO);
+	return state != LOW;
 }
 
-void XX_SetLineState(CEC_Device* device, bool state)
+void MyCEC_Device::SetLineState(bool state)
 {
-  if (state)
-  {
-    pinMode(CEC_GPIO, INPUT_PULLUP);
-  } else {
-    digitalWrite(CEC_GPIO, LOW);
-    pinMode(CEC_GPIO, OUTPUT);
-  }
-  // give enough time for the line to settle before sampling
-  // it
-  delayMicroseconds(50);
+	if (state)
+	{
+		pinMode(CEC_GPIO, INPUT_PULLUP);
+	} else {
+		digitalWrite(CEC_GPIO, LOW);
+		pinMode(CEC_GPIO, OUTPUT);
+	}
+	// give enough time for the line to settle before sampling it
+	delayMicroseconds(50);
 }
+
+void MyCEC_Device::OnReady(int logicalAddress)
+{
+	// This is called after the logical address has been allocated
+	DbgPrint("Device ready, Logical address assigned: %d\n", logicalAddress);
+}
+
+void MyCEC_Device::OnReceiveComplete(unsigned char* buffer, int count, bool ack)
+{
+	// This is called when a frame is received.  To transmit
+	// a frame call TransmitFrame.  To receive all frames, even
+	// those not addressed to this device, set Promiscuous to true.
+	DbgPrint("Packet received at %ld: %02X", millis(), buffer[0]);
+	for (int i = 1; i < count; i++)
+		DbgPrint(":%02X", buffer[i]);
+	if (!ack)
+		DbgPrint(" NAK");
+	DbgPrint("\n");
+}
+
+void MyCEC_Device::OnTransmitComplete(unsigned char* buffer, int count, bool ack)
+{
+	// This is called after a frame is transmitted.
+	DbgPrint("Packet sent at %ld: %02X", millis(), buffer[0]);
+	for (int i = 1; i < count; i++)
+		DbgPrint(":%02X", buffer[i]);
+	if (!ack)
+		DbgPrint(" NAK");
+	DbgPrint("\n");
+}
+
+
+MyCEC_Device device;
 
 void setup()
 {
@@ -68,4 +109,3 @@ void loop()
   }
   device.Run();
 }
-
