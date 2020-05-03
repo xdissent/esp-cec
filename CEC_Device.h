@@ -1,9 +1,9 @@
-#ifndef CECWIRE_H__
-#define CECWIRE_H__
+#ifndef CEC_DEVICE_H__
+#define CEC_DEVICE_H__
 
 #include "Common.h"
 
-class CEC_Electrical
+class CEC_Device
 {
 public:
 	typedef enum {
@@ -15,7 +15,7 @@ public:
 	} CEC_DEVICE_TYPE;
 
 public:
-	CEC_Electrical();
+	CEC_Device();
 	void Initialize(int physicalAddress, CEC_DEVICE_TYPE type, bool promiscuous = false, bool monitorMode = false);
 	bool TransmitFrame(int targetAddress, unsigned char* buffer, int count);
 	void Run();
@@ -125,4 +125,4 @@ private:
 	CEC_STATE _state;
 };
 
-#endif // CECWIRE_H__
+#endif // CEC_DEVICE_H__

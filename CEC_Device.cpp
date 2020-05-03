@@ -1,6 +1,6 @@
-#include "CECWire.h"
+#include "CEC_Device.h"
 
-CEC_Electrical::CEC_Electrical() :
+CEC_Device::CEC_Device() :
 	_monitorMode(true),
 	_promiscuous(false),
 	_logicalAddress(-1),
@@ -13,7 +13,7 @@ CEC_Electrical::CEC_Electrical() :
 {
 }
 
-void CEC_Electrical::Initialize(int physicalAddress, CEC_DEVICE_TYPE type, bool promiscuous, bool monitorMode)
+void CEC_Device::Initialize(int physicalAddress, CEC_DEVICE_TYPE type, bool promiscuous, bool monitorMode)
 {
 	static const char valid_LogicalAddressesTV[3]    = {CLA_TV, CLA_FREE_USE, CLA_UNREGISTERED};
 	static const char valid_LogicalAddressesRec[4]   = {CLA_RECORDING_DEVICE_1, CLA_RECORDING_DEVICE_2,
@@ -43,12 +43,12 @@ void CEC_Electrical::Initialize(int physicalAddress, CEC_DEVICE_TYPE type, bool 
 }
 
 ///
-/// CEC_Electrical::Run implements our main state machine
+/// CEC_Device::Run implements our main state machine
 /// which includes all reading and writing of state including
 /// acknowledgements and arbitration
 ///
 
-void CEC_Electrical::Run()
+void CEC_Device::Run()
 {
 	bool currentLineState = LineState();
 	unsigned long time = micros();
@@ -378,7 +378,7 @@ void CEC_Electrical::Run()
         _lastLineState = LineState();
 }
 
-bool CEC_Electrical::Transmit(int sourceAddress, int targetAddress, unsigned char* buffer, unsigned int count)
+bool CEC_Device::Transmit(int sourceAddress, int targetAddress, unsigned char* buffer, unsigned int count)
 {
 	if (_monitorMode)
 		return false; // we must not transmit in monitor mode
@@ -395,7 +395,7 @@ bool CEC_Electrical::Transmit(int sourceAddress, int targetAddress, unsigned cha
 	return true;
 }
 
-bool CEC_Electrical::TransmitFrame(int targetAddress, unsigned char* buffer, int count)
+bool CEC_Device::TransmitFrame(int targetAddress, unsigned char* buffer, int count)
 {
 	if (_logicalAddress < 0)
 		return false;

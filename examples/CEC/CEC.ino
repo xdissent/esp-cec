@@ -1,4 +1,4 @@
-#include "CECWire.h"
+#include "CEC_Device.h"
 
 // NodeMCU ESP8266 Pins   bootstrap
 // D0  GPIO16  DeepSleep  blue LED connected to 3V3
@@ -22,7 +22,7 @@
 #define CEC_GPIO 5
 
 // implement application specific CEC device
-class MyCEC_Device : public CEC_Electrical
+class MyCEC_Device : public CEC_Device
 {
 protected:
 	virtual bool LineState();
