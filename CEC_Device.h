@@ -1,13 +1,12 @@
 #ifndef CEC_DEVICE_H__
 #define CEC_DEVICE_H__
 
-#include "CEC.h"
+#include "CECWire.h"
 
-class CEC_Device : public CEC_LogicalDevice
+class CEC_Device : public CEC_Electrical
 {
 public:
-  CEC_Device(int physicalAddress);
-  virtual ~CEC_Device();
+  CEC_Device();
   
 protected:
   virtual bool LineState();

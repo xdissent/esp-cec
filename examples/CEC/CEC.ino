@@ -21,7 +21,7 @@
 
 #define CEC_GPIO 5
 
-CEC_Device device(0x1000);
+CEC_Device device;
 
 bool XX_GetLineState()
 {
@@ -48,7 +48,7 @@ void setup()
   pinMode(CEC_GPIO, INPUT_PULLUP);
 
   Serial.begin(115200);
-  device.Initialize(CEC_LogicalDevice::CDT_PLAYBACK_DEVICE, true);
+  device.Initialize(0x1000, CEC_Device::CDT_PLAYBACK_DEVICE, true);
 }
 
 void loop()

@@ -16,7 +16,7 @@ public:
 
 public:
 	CEC_Electrical();
-	void Initialize(CEC_DEVICE_TYPE type, bool promiscuous = false, bool monitorMode = false);
+	void Initialize(int physicalAddress, CEC_DEVICE_TYPE type, bool promiscuous = false, bool monitorMode = false);
 	bool TransmitFrame(int targetAddress, unsigned char* buffer, int count);
 	void Run();
 
@@ -54,6 +54,7 @@ private:
 		CLA_UNREGISTERED,
 	} CEC_LOGICAL_ADDRESS;
 
+	int _physicalAddress;
 	int _logicalAddress;
 	const char *_validLogicalAddresses;
 

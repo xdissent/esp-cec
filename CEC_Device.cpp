@@ -3,12 +3,8 @@
 bool XX_GetLineState();
 void XX_SetLineState(CEC_Device* device, bool state);
 
-CEC_Device::CEC_Device(int physicalAddress)
-: CEC_LogicalDevice(physicalAddress)
-{
-}
-
-CEC_Device::~CEC_Device()
+CEC_Device::CEC_Device()
+: CEC_Electrical()
 {
 }
 
