@@ -40,8 +40,7 @@ bool MyCEC_Device::LineState()
 
 void MyCEC_Device::SetLineState(bool state)
 {
-	if (state)
-	{
+	if (state) {
 		pinMode(CEC_GPIO, INPUT_PULLUP);
 	} else {
 		digitalWrite(CEC_GPIO, LOW);
@@ -86,26 +85,24 @@ MyCEC_Device device;
 
 void setup()
 {
-  pinMode(CEC_GPIO, INPUT_PULLUP);
+	pinMode(CEC_GPIO, INPUT_PULLUP);
 
-  Serial.begin(115200);
-  device.Initialize(0x1000, CEC_Device::CDT_PLAYBACK_DEVICE, true);
+	Serial.begin(115200);
+	device.Initialize(0x1000, CEC_Device::CDT_PLAYBACK_DEVICE, true);
 }
 
 void loop()
 {
-  if (Serial.available())
-  {
-    unsigned char c = Serial.read();
-    unsigned char buffer[3];
+	if (Serial.available()) {
+		unsigned char c = Serial.read();
+		unsigned char buffer[3];
     
-    switch (c)
-    {
-      case '1':
-        buffer[0] = 0x36;
-        device.TransmitFrame(4, buffer, 1);
-        break;
-    }
-  }
-  device.Run();
+		switch (c) {
+		case '1':
+			buffer[0] = 0x36;
+			device.TransmitFrame(4, buffer, 1);
+			break;
+		}
+	}
+	device.Run();
 }
