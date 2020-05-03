@@ -1,8 +1,8 @@
 #include "CECWire.h"
 
 CEC_Electrical::CEC_Electrical() :
-	MonitorMode(false),
-	Promiscuous(false),
+	_monitorMode(true),
+	_promiscuous(false),
 	_logicalAddress(-1),
 	_state(CEC_IDLE),
 	_receiveBufferBits(0),
@@ -13,7 +13,7 @@ CEC_Electrical::CEC_Electrical() :
 {
 }
 
-void CEC_Electrical::Initialize(CEC_DEVICE_TYPE type)
+void CEC_Electrical::Initialize(CEC_DEVICE_TYPE type, bool promiscuous, bool monitorMode)
 {
 	static const char valid_LogicalAddressesTV[3]    = {CLA_TV, CLA_FREE_USE, CLA_UNREGISTERED};
 	static const char valid_LogicalAddressesRec[4]   = {CLA_RECORDING_DEVICE_1, CLA_RECORDING_DEVICE_2,
@@ -32,6 +32,9 @@ void CEC_Electrical::Initialize(CEC_DEVICE_TYPE type)
 	case CDT_TUNER:            _validLogicalAddresses = valid_LogicalAddressesTuner; break;
 	case CDT_AUDIO_SYSTEM:     _validLogicalAddresses = valid_LogicalAddressesAudio; break;
 	}
+
+	_promiscuous = promiscuous;
+	_monitorMode = monitorMode;
 
 	// <Polling Message> to allocate a Logical Address
 	Transmit(*_validLogicalAddresses, *_validLogicalAddresses, NULL, 0);
@@ -184,12 +187,12 @@ void CEC_Electrical::Run()
 					// Go low for ack/nak
 					if ((_follower && _ack) || (_broadcast && !_ack))
 					{
-						if (!MonitorMode)
+						if (!_monitorMode)
 							SetLineState(0);
 						_state = CEC_RCV_ACK_SENT;
 						_waitTime = BIT_TIME_LOW_0;
 					}
-					else if (!_ack || (!Promiscuous && !_broadcast))
+					else if (!_ack || (!_promiscuous && !_broadcast))
 					{
 						// It's broken or not addressed to us.
 						// Go back to CEC_IDLE to wait for a valid start bit or start pending transmit
@@ -203,7 +206,7 @@ void CEC_Electrical::Run()
 				break;
 			}
 			// Line error.
-			if (MonitorMode)
+			if (_monitorMode)
 			{
 				_state = CEC_IDLE;
 				break;
@@ -375,7 +378,7 @@ void CEC_Electrical::Run()
 
 bool CEC_Electrical::Transmit(int sourceAddress, int targetAddress, unsigned char* buffer, unsigned int count)
 {
-	if (MonitorMode)
+	if (_monitorMode)
 		return false; // we must not transmit in monitor mode
 	if (_transmitBufferBytes != 0)
 		return false; // pending transmit packet

@@ -48,9 +48,7 @@ void setup()
   pinMode(CEC_GPIO, INPUT_PULLUP);
 
   Serial.begin(115200);
-  //device.MonitorMode = true;
-  device.Promiscuous = true;
-  device.Initialize(CEC_LogicalDevice::CDT_PLAYBACK_DEVICE);
+  device.Initialize(CEC_LogicalDevice::CDT_PLAYBACK_DEVICE, true);
 }
 
 void loop()

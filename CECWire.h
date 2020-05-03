@@ -16,12 +16,9 @@ public:
 
 public:
 	CEC_Electrical();
-	void Initialize(CEC_DEVICE_TYPE type);
+	void Initialize(CEC_DEVICE_TYPE type, bool promiscuous = false, bool monitorMode = false);
 	bool TransmitFrame(int targetAddress, unsigned char* buffer, int count);
 	void Run();
-
-	int Promiscuous;
-	int MonitorMode;
 
 protected:
 	virtual bool LineState() = 0;
@@ -34,6 +31,9 @@ private:
 	bool Transmit(int sourceAddress, int targetAddress, unsigned char* buffer, unsigned int count);
 
 private:
+	bool _promiscuous;
+	bool _monitorMode;
+
 	// CEC locical address handling
 	typedef enum {
 		CLA_TV = 0,
