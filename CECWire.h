@@ -87,6 +87,4 @@ private:
 	CEC_STATE _state;
 };
 
-
-
 #endif // CECWIRE_H__
