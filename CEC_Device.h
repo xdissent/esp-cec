@@ -13,7 +13,7 @@ protected:
   virtual bool LineState();
   virtual void SetLineState(bool);
 
-  virtual void OnReady();
+  virtual void OnReady(int logicalAddress);
   virtual void OnReceiveComplete(unsigned char* buffer, int count, bool ack);
   virtual void OnTransmitComplete(unsigned char* buffer, int count, bool ack);
 

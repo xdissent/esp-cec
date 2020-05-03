@@ -12,11 +12,10 @@ CEC_Device::~CEC_Device()
 {
 }
 
-void CEC_Device::OnReady()
+void CEC_Device::OnReady(int logicalAddress)
 {
-  // This is called after the logical address has been
-  // allocated
-  DbgPrint("Device ready\n");
+	// This is called after the logical address has been allocated
+	DbgPrint("Device ready, Logical address assigned: %d\n", logicalAddress);
 }
 
 void CEC_Device::OnReceiveComplete(unsigned char* buffer, int count, bool ack)
@@ -41,7 +40,6 @@ void CEC_Device::OnTransmitComplete(unsigned char* buffer, int count, bool ack)
   if (!ack)
     DbgPrint(" NAK");
   DbgPrint("\n");
-  CEC_LogicalDevice::OnTransmitComplete(buffer, count, ack);
 }
 
 bool CEC_Device::LineState()

@@ -3,7 +3,7 @@
 CEC_Electrical::CEC_Electrical() :
 	MonitorMode(false),
 	Promiscuous(false),
-	_logicalAddress(0xf),
+	_logicalAddress(-1),
 	_state(CEC_IDLE),
 	_receiveBufferBits(0),
 	_transmitBufferBytes(0),
@@ -11,6 +11,30 @@ CEC_Electrical::CEC_Electrical() :
 	_bitStartTime(0),
 	_waitTime(0)
 {
+}
+
+void CEC_Electrical::Initialize(CEC_DEVICE_TYPE type)
+{
+	static const char valid_LogicalAddressesTV[3]    = {CLA_TV, CLA_FREE_USE, CLA_UNREGISTERED};
+	static const char valid_LogicalAddressesRec[4]   = {CLA_RECORDING_DEVICE_1, CLA_RECORDING_DEVICE_2,
+	                                                    CLA_RECORDING_DEVICE_3, CLA_UNREGISTERED};
+	static const char valid_LogicalAddressesPlay[4]  = {CLA_PLAYBACK_DEVICE_1, CLA_PLAYBACK_DEVICE_2,
+	                                                    CLA_PLAYBACK_DEVICE_3, CLA_UNREGISTERED};
+	static const char valid_LogicalAddressesTuner[5] = {CLA_TUNER_1, CLA_TUNER_2, CLA_TUNER_3,
+	                                                    CLA_TUNER_4, CLA_UNREGISTERED};
+	static const char valid_LogicalAddressesAudio[2] = {CLA_AUDIO_SYSTEM, CLA_UNREGISTERED};
+
+	switch(type)
+	{
+	case CDT_TV:               _validLogicalAddresses = valid_LogicalAddressesTV;    break;
+	case CDT_RECORDING_DEVICE: _validLogicalAddresses = valid_LogicalAddressesRec;   break;
+	case CDT_PLAYBACK_DEVICE:  _validLogicalAddresses = valid_LogicalAddressesPlay;  break;
+	case CDT_TUNER:            _validLogicalAddresses = valid_LogicalAddressesTuner; break;
+	case CDT_AUDIO_SYSTEM:     _validLogicalAddresses = valid_LogicalAddressesAudio; break;
+	}
+
+	// <Polling Message> to allocate a Logical Address
+	Transmit(*_validLogicalAddresses, *_validLogicalAddresses, NULL, 0);
 }
 
 ///
@@ -289,22 +313,46 @@ void CEC_Electrical::Run()
 		case CEC_XMIT_ACK_TEST:
 			if ((currentLineState != 0) != _broadcast)
 			{
-				// not being acknowledged
+				// Not being acknowledged
 				OnTransmitComplete(_transmitBuffer, _transmitBufferBitIdx >> 3, false);
 
-				// normally we retransmit.  But this is NOT the case for <Polling Message> as its
+				// Normally we retransmit.  But this is NOT the case for <Polling Message> as its
 				// function is basically to 'ping' a logical address in which case we just want 
 				// acknowledgement that it has succeeded or failed
 				if (_transmitBufferBytes == 1)
 					_transmitBufferBytes = 0;
+
+				if (_logicalAddress < 0)
+				{
+					// Claim this as our logical address
+					_logicalAddress = *_validLogicalAddresses;
+					OnReady(_logicalAddress);
+				}
+
 				_state = CEC_IDLE;
 				break;
 			}
 			if (_eom)
 			{
 				// Nothing left to transmit, go back to idle
-				OnTransmitComplete(_transmitBuffer, _transmitBufferBitIdx >> 3, true);
 				_transmitBufferBytes = 0;
+				OnTransmitComplete(_transmitBuffer, _transmitBufferBitIdx >> 3, true);
+
+				if (_logicalAddress < 0)
+				{
+					// Someone is there, try to allocate the next possible logical address
+					if (*++_validLogicalAddresses != CLA_UNREGISTERED)
+					{
+						Transmit(*_validLogicalAddresses, *_validLogicalAddresses, NULL, 0);
+					}
+					else
+					{
+						// No other logical address, use CLA_UNREGISTERED
+						_logicalAddress = CLA_UNREGISTERED;
+						OnReady(_logicalAddress);
+					}
+				}
+
 				_state = CEC_IDLE;
 				break;
 			}
@@ -340,4 +388,12 @@ bool CEC_Electrical::Transmit(int sourceAddress, int targetAddress, unsigned cha
 	_transmitBufferBytes = count + 1;
 	_xmitretry = 0;
 	return true;
+}
+
+bool CEC_Electrical::TransmitFrame(int targetAddress, unsigned char* buffer, int count)
+{
+	if (_logicalAddress < 0)
+		return false;
+
+	return Transmit(_logicalAddress, targetAddress, buffer, count);
 }
