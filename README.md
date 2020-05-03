@@ -8,3 +8,5 @@ This is an Arduino library which implements the HDMI v1.3a CEC wire protocol whi
 This library version was adapted to run on ESP8266 boards, e.g. NodeMCU. It is designed to use a single GPIO pin and, since ESP8266 has 3.3V GPIOs, needs a much simpler interface circuit than in the original library version.
 
 ![CEC interface schematic](extras/cec.png)
+
+Since there is an internal pull-up used and the GPIO is not shorted to ground when the device is switched off, on ESP8266 even a direct connection from the CEC line to the GPIO pin may work.
