@@ -30,6 +30,7 @@ void CEC_Device::Initialize(int physicalAddress, CEC_DEVICE_TYPE type, bool prom
 	case CDT_PLAYBACK_DEVICE:  _validLogicalAddresses = valid_LogicalAddressesPlay;  break;
 	case CDT_TUNER:            _validLogicalAddresses = valid_LogicalAddressesTuner; break;
 	case CDT_AUDIO_SYSTEM:     _validLogicalAddresses = valid_LogicalAddressesAudio; break;
+	default:                   _validLogicalAddresses = NULL;
 	}
 
 	_promiscuous = promiscuous;
@@ -37,7 +38,7 @@ void CEC_Device::Initialize(int physicalAddress, CEC_DEVICE_TYPE type, bool prom
 	_physicalAddress = physicalAddress & 0xffff;
 
 	// <Polling Message> to allocate a logical address when physical address is valid
-	if (_physicalAddress != 0xffff)
+	if (_validLogicalAddresses && _physicalAddress != 0xffff)
 		Transmit(*_validLogicalAddresses, *_validLogicalAddresses, NULL, 0);
 }
 

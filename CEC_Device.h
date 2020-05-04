@@ -7,10 +7,11 @@ class CEC_Device
 {
 public:
 	typedef enum {
-		CDT_TV,
+		CDT_TV = 0,
 		CDT_RECORDING_DEVICE,
-		CDT_PLAYBACK_DEVICE,
+		CDT_RESERVED,
 		CDT_TUNER,
+		CDT_PLAYBACK_DEVICE,
 		CDT_AUDIO_SYSTEM,
 	} CEC_DEVICE_TYPE;
 
