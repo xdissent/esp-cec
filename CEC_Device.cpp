@@ -344,7 +344,7 @@ void CEC_Device::Run()
 	_lastLineState = LineState();
 }
 
-bool CEC_Device::Transmit(int sourceAddress, int targetAddress, unsigned char* buffer, unsigned int count)
+bool CEC_Device::Transmit(int sourceAddress, int targetAddress, const unsigned char* buffer, unsigned int count)
 {
 	if (_monitorMode)
 		return false; // we must not transmit in monitor mode
@@ -361,7 +361,7 @@ bool CEC_Device::Transmit(int sourceAddress, int targetAddress, unsigned char* b
 	return true;
 }
 
-bool CEC_Device::TransmitFrame(int targetAddress, unsigned char* buffer, int count)
+bool CEC_Device::TransmitFrame(int targetAddress, const unsigned char* buffer, int count)
 {
 	if (_logicalAddress < 0)
 		return false;
