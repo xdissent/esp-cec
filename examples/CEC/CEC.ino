@@ -20,6 +20,8 @@
 // CMD GPIO11  SD_CMD
 
 #define CEC_GPIO 5
+#define CEC_DEVICE_TYPE CEC_Device::CDT_PLAYBACK_DEVICE
+#define CEC_PHYSICAL_ADDRESS 0x2000
 
 // implement application specific CEC device
 class MyCEC_Device : public CEC_Device
@@ -53,7 +55,12 @@ void MyCEC_Device::SetLineState(bool state)
 void MyCEC_Device::OnReady(int logicalAddress)
 {
 	// This is called after the logical address has been allocated
+
+	unsigned char buf[4] = {0x84, CEC_PHYSICAL_ADDRESS >> 8, CEC_PHYSICAL_ADDRESS & 0xff, CEC_DEVICE_TYPE};
+
 	DbgPrint("Device ready, Logical address assigned: %d\n", logicalAddress);
+
+	TransmitFrame(0xf, buf, 4); // <Report Physical Address>
 }
 
 void MyCEC_Device::OnReceiveComplete(unsigned char* buffer, int count, bool ack)
@@ -88,7 +95,7 @@ void setup()
 	pinMode(CEC_GPIO, INPUT_PULLUP);
 
 	Serial.begin(115200);
-	device.Initialize(0x1000, CEC_Device::CDT_PLAYBACK_DEVICE, true);
+	device.Initialize(CEC_PHYSICAL_ADDRESS, CEC_DEVICE_TYPE, true);
 }
 
 void loop()
