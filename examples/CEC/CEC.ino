@@ -74,6 +74,25 @@ void MyCEC_Device::OnReceiveComplete(unsigned char* buffer, int count, bool ack)
 	if (!ack)
 		DbgPrint(" NAK");
 	DbgPrint("\n");
+
+	// Ignore messages not sent to us
+	if ((buffer[0] & 0xf) != LogicalAddress())
+		return;
+
+	// No command received?
+	if (count < 1)
+		return;
+
+	switch (buffer[1]) {
+	case 0x83: { // <Give Physical Address>
+		unsigned char buf[4] = {0x84, CEC_PHYSICAL_ADDRESS >> 8, CEC_PHYSICAL_ADDRESS & 0xff, CEC_DEVICE_TYPE};
+		TransmitFrame(0xf, buf, 4); // <Report Physical Address>
+		break;
+	}
+	case 0x8c: // <Give Device Vendor ID>
+		TransmitFrame(0xf, (unsigned char*)"\x87\x01\x23\x45", 4); // <Device Vendor ID>
+		break;
+	}
 }
 
 void MyCEC_Device::OnTransmitComplete(unsigned char* buffer, int count, bool ack)
@@ -95,7 +114,7 @@ void setup()
 	pinMode(CEC_GPIO, INPUT_PULLUP);
 
 	Serial.begin(115200);
-	device.Initialize(CEC_PHYSICAL_ADDRESS, CEC_DEVICE_TYPE, true);
+	device.Initialize(CEC_PHYSICAL_ADDRESS, CEC_DEVICE_TYPE, true); // Promiscuous mode
 }
 
 void loop()

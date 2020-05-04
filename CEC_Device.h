@@ -59,6 +59,10 @@ private:
 	int _logicalAddress;
 	const char *_validLogicalAddresses;
 
+protected:
+	int LogicalAddress() { return _logicalAddress; }
+
+private:
 	// Receive buffer
 	unsigned char _receiveBuffer[16];
 	unsigned int _receiveBufferBits;
