@@ -36,6 +36,7 @@ void CEC_Device::Initialize(int physicalAddress, CEC_DEVICE_TYPE type, bool prom
 	_promiscuous = promiscuous;
 	_monitorMode = monitorMode;
 	_physicalAddress = physicalAddress & 0xffff;
+	_logicalAddress = -1;
 
 	// <Polling Message> to allocate a logical address when physical address is valid
 	if (_validLogicalAddresses && _physicalAddress != 0xffff)
