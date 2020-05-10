@@ -252,11 +252,6 @@ void CEC_Device::Run()
 	case CEC_XMIT_EOM1:
 		// We finished the first half of the bit, send the rising edge
 		SetLineState(1);
-		if (!LineState()) {
-			// Error, start retransmit
-			_state = CEC_IDLE;
-			break;
-		}
 		_waitTime = (_state == CEC_XMIT_STARTBIT1) ? STARTBIT_TIME : BIT_TIME;
 		_state = (CEC_STATE)(_state + 1);
 		break;
@@ -286,7 +281,7 @@ void CEC_Device::Run()
 
 	case CEC_XMIT_ACK1:
 		// We finished the first half of the ack bit, release the line
-		SetLineState(1); // No check, maybe follower pulls low for ACK
+		SetLineState(1); // Maybe follower pulls low for ACK
 		_waitTime = BIT_TIME_SAMPLE;
 		_state = CEC_XMIT_ACK_TEST;
 		break;
