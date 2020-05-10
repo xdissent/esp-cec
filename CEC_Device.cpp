@@ -54,41 +54,44 @@ void CEC_Device::Run()
 	bool currentLineState = LineState();
 	unsigned long time = micros();
 	unsigned long difftime = time - _bitStartTime;
-	if (currentLineState == _lastLineState &&
-	    ((_waitTime == (unsigned int)-1 && _state != CEC_IDLE && _state != CEC_XMIT_WAIT) ||
-	     (_waitTime != (unsigned int)-1 && _waitTime > difftime)))
+	if (currentLineState == _lastLineState && _state != CEC_IDLE &&
+	    (_waitTime == (unsigned int)-1 || _waitTime > difftime))
+		// No line transition and wait for external event, or wait time not elapsed; nothing to do
+		// In IDLE state we need to check for pending transmit, though
 		return;
 
 	if (currentLineState != _lastLineState &&
 	    _state >= CEC_XMIT_WAIT && _state != CEC_XMIT_ACK_TEST && _state != CEC_XMIT_ACK_WAIT)
-		// We are in a transmit state and someone else is mucking with the line.  Wait for the
-		// line to clear before appropriately before (re)transmit
-		// However it is OK for a follower to ACK if we are in an ACK state
+		// We are in a transmit state and someone else is mucking with the line
+		// Try to receive and wait for the line to clear before (re)transmit
+		// However, it is OK for a follower to ACK if we are in an ACK state
 		_state = CEC_IDLE;
 
 	bool bit;
 	_waitTime = (unsigned int)-1;	// INFINITE by default; (== wait until an external event has occurred)
 	switch (_state) {
 	case CEC_IDLE:
-		// If a high to low transition occurs, then we must be
-		// beginning a start bit
+		// If a high to low transition occurs, this must be the beginning of a start bit
 		if (!currentLineState) {
-			_state = CEC_RCV_STARTBIT1;
 			_receiveBufferBits = 0;
 			_bitStartTime = time;
 			_ack = true;
 			_follower = false;
 			_broadcast = false;
 			_amLastTransmittor = false;
-			break;
+			_state = CEC_RCV_STARTBIT1;
 		} else if (_transmitBufferBytes)
 			// Transmit pending
 			if (_xmitretry > CEC_MAX_RETRANSMIT)
 				// No more
 				_transmitBufferBytes = 0;
-			else
+			else {
+				// We need to wait a certain amount of time before we can transmit
+				_waitTime = ((_xmitretry) ?  3 * BIT_TIME :
+				             (_amLastTransmittor) ? 7 * BIT_TIME :
+				             5 * BIT_TIME);
 				_state = CEC_XMIT_WAIT;
-		
+			}
 		// Nothing to do until we have a need to transmit
 		// or we detect the falling edge of the start bit
 		break;
@@ -222,29 +225,15 @@ void CEC_Device::Run()
 		break;
 
 	case CEC_XMIT_WAIT:
-		// We need to wait a certain amount of time before we can
-		// transmit..
-
-		// If the line is low, we can't do anything now.  Wait
-		// indefinitely until a line state changes
-		if (currentLineState == 0)
-			break;
-		// The line is high.  Have we waited long enough?
-		unsigned int neededIdleTime;
-		neededIdleTime = ((_xmitretry) ?  3 * BIT_TIME :
-		                  (_amLastTransmittor) ? 7 * BIT_TIME :
-		                  5 * BIT_TIME);
-		if (difftime >= neededIdleTime) {
-			// we've wait long enough, begin start bit
-			SetLineState(0);
-			_bitStartTime = time;
-			_transmitBufferBitIdx = 0;
-			_xmitretry++;
-			_amLastTransmittor = true;
-			_broadcast = (_transmitBuffer[0] & 0x0f) == 0x0f;
-			_waitTime = STARTBIT_TIME_LOW;
-			_state = CEC_XMIT_STARTBIT1;
-		}
+		// We waited long enough, begin start bit
+		SetLineState(0);
+		_bitStartTime = time;
+		_transmitBufferBitIdx = 0;
+		_xmitretry++;
+		_amLastTransmittor = true;
+		_broadcast = (_transmitBuffer[0] & 0x0f) == 0x0f;
+		_waitTime = STARTBIT_TIME_LOW;
+		_state = CEC_XMIT_STARTBIT1;
 		break;
 
 	case CEC_XMIT_STARTBIT1:
