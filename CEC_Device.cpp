@@ -83,7 +83,7 @@ void CEC_Device::Run()
 			break;
 		} else if (_transmitBufferBytes)
 			// Transmit pending
-			if (++_xmitretry > CEC_MAX_RETRANSMIT)
+			if (_xmitretry > CEC_MAX_RETRANSMIT)
 				// No more
 				_transmitBufferBytes = 0;
 			else
@@ -239,6 +239,7 @@ void CEC_Device::Run()
 			SetLineState(0);
 			_bitStartTime = time;
 			_transmitBufferBitIdx = 0;
+			_xmitretry++;
 			_amLastTransmittor = true;
 			_broadcast = (_transmitBuffer[0] & 0x0f) == 0x0f;
 			_waitTime = STARTBIT_TIME_LOW;
