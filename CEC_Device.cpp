@@ -1,15 +1,15 @@
 #include "CEC_Device.h"
 
 CEC_Device::CEC_Device() :
-	_monitorMode(true),
 	_promiscuous(false),
+	_monitorMode(true),
 	_logicalAddress(-1),
-	_state(CEC_IDLE),
 	_receiveBufferBits(0),
 	_transmitBufferBytes(0),
-	_amLastTransmittor(false),
 	_bitStartTime(0),
-	_waitTime(0)
+	_waitTime(0),
+	_amLastTransmittor(false),
+	_state(CEC_IDLE)
 {
 }
 
@@ -80,7 +80,7 @@ void CEC_Device::Run()
 			_broadcast = false;
 			_amLastTransmittor = false;
 			_state = CEC_RCV_STARTBIT1;
-		} else if (_transmitBufferBytes)
+		} else if (_transmitBufferBytes) {
 			// Transmit pending
 			if (_xmitretry > CEC_MAX_RETRANSMIT)
 				// No more
@@ -92,6 +92,7 @@ void CEC_Device::Run()
 				             5 * BIT_TIME);
 				_state = CEC_XMIT_WAIT;
 			}
+		}
 		// Nothing to do until we have a need to transmit
 		// or we detect the falling edge of the start bit
 		break;
@@ -107,7 +108,7 @@ void CEC_Device::Run()
 		// Illegal state.  Go back to CEC_IDLE to wait for a valid start bit or start pending transmit
 		_state = CEC_IDLE;
 		break;
-		
+
 	case CEC_RCV_STARTBIT2:
 		// This should be the falling edge of the start bit
 		if (difftime >= (STARTBIT_TIME - BIT_TIME_LOW_MARGIN)) {
@@ -120,7 +121,7 @@ void CEC_Device::Run()
 		// Illegal state.  Go back to CEC_IDLE to wait for a valid start bit or start pending transmit
 		_state = CEC_IDLE;
 		break;
-		
+
 	case CEC_RCV_DATABIT1:
 	case CEC_RCV_EOM1:
 	case CEC_RCV_ACK1:
@@ -262,7 +263,8 @@ void CEC_Device::Run()
 		} else {
 			_state = CEC_XMIT_DATABIT1;
 			// Pull bit from transmit buffer
-			unsigned char b = _transmitBuffer[_transmitBufferBitIdx >> 3] << (_transmitBufferBitIdx++ & 7);
+			unsigned char b = _transmitBuffer[_transmitBufferBitIdx >> 3] << (_transmitBufferBitIdx & 7);
+			_transmitBufferBitIdx++;
 			bit = b >> 7;
 		}
 		_waitTime = bit ? BIT_TIME_LOW_1 : BIT_TIME_LOW_0;
