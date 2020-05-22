@@ -18,6 +18,7 @@ public:
 public:
 	CEC_Device();
 	void Initialize(int physicalAddress, CEC_DEVICE_TYPE type, bool promiscuous = false, bool monitorMode = false);
+	void Initialize(int physicalAddress, std::vector<CEC_DEVICE_TYPE> types, bool promiscuous = false, bool monitorMode = false);
 	bool TransmitFrame(int targetAddress, const unsigned char* buffer, int count);
 	void Run();
 
@@ -28,7 +29,7 @@ protected:
 	virtual void OnReceiveComplete(unsigned char* buffer, int count, bool ack) = 0;
 	virtual void OnReady(int logicalAddress) = 0;
 
-private:
+public:
 	bool Transmit(int sourceAddress, int targetAddress, const unsigned char* buffer, unsigned int count);
 
 private:
@@ -55,12 +56,23 @@ private:
 		CLA_UNREGISTERED,
 	} CEC_LOGICAL_ADDRESS;
 
+	struct LogicalAddressInfo {
+		int logicalAddress;
+		const char *validLogicalAddresses;
+	};
+
 	int _physicalAddress;
-	int _logicalAddress;
-	const char *_validLogicalAddresses;
+	std::vector<LogicalAddressInfo> _logicalAddresses;
+	int _logicalAddressMask;
 
 protected:
-	int LogicalAddress() { return _logicalAddress; }
+	int LogicalAddressMask() {
+		return _logicalAddressMask;
+	}
+
+	int LogicalAddress() {
+		return _logicalAddresses.size() > 0 ? _logicalAddresses.front().logicalAddress : -1;
+	}
 
 private:
 	// Receive buffer

@@ -3,7 +3,7 @@
 CEC_Device::CEC_Device() :
 	_promiscuous(false),
 	_monitorMode(true),
-	_logicalAddress(-1),
+	_logicalAddressMask(0),
 	_receiveBufferBits(0),
 	_transmitBufferBytes(0),
 	_bitStartTime(0),
@@ -13,7 +13,12 @@ CEC_Device::CEC_Device() :
 {
 }
 
-void CEC_Device::Initialize(int physicalAddress, CEC_DEVICE_TYPE type, bool promiscuous, bool monitorMode)
+void  CEC_Device::Initialize(int physicalAddress, CEC_DEVICE_TYPE type, bool promiscuous, bool monitorMode)
+{
+	this->Initialize(physicalAddress, std::vector<CEC_DEVICE_TYPE> {type}, promiscuous, monitorMode);
+}
+
+void CEC_Device::Initialize(int physicalAddress, std::vector<CEC_DEVICE_TYPE> types, bool promiscuous, bool monitorMode)
 {
 	static const char valid_LogicalAddressesTV[3]    = {CLA_TV, CLA_FREE_USE, CLA_UNREGISTERED};
 	static const char valid_LogicalAddressesRec[4]   = {CLA_RECORDING_DEVICE_1, CLA_RECORDING_DEVICE_2,
@@ -24,23 +29,34 @@ void CEC_Device::Initialize(int physicalAddress, CEC_DEVICE_TYPE type, bool prom
 	                                                    CLA_TUNER_4, CLA_UNREGISTERED};
 	static const char valid_LogicalAddressesAudio[2] = {CLA_AUDIO_SYSTEM, CLA_UNREGISTERED};
 
-	switch(type) {
-	case CDT_TV:               _validLogicalAddresses = valid_LogicalAddressesTV;    break;
-	case CDT_RECORDING_DEVICE: _validLogicalAddresses = valid_LogicalAddressesRec;   break;
-	case CDT_PLAYBACK_DEVICE:  _validLogicalAddresses = valid_LogicalAddressesPlay;  break;
-	case CDT_TUNER:            _validLogicalAddresses = valid_LogicalAddressesTuner; break;
-	case CDT_AUDIO_SYSTEM:     _validLogicalAddresses = valid_LogicalAddressesAudio; break;
-	default:                   _validLogicalAddresses = NULL;
+	for (auto &type : types) {
+		const char *validLogicalAddresses;
+		switch(type) {
+			case CDT_TV:               validLogicalAddresses = valid_LogicalAddressesTV;    break;
+			case CDT_RECORDING_DEVICE: validLogicalAddresses = valid_LogicalAddressesRec;   break;
+			case CDT_PLAYBACK_DEVICE:  validLogicalAddresses = valid_LogicalAddressesPlay;  break;
+			case CDT_TUNER:            validLogicalAddresses = valid_LogicalAddressesTuner; break;
+			case CDT_AUDIO_SYSTEM:     validLogicalAddresses = valid_LogicalAddressesAudio; break;
+			default:                   validLogicalAddresses = NULL;
+		}
+    _logicalAddresses.push_back(LogicalAddressInfo{
+			.logicalAddress = -1,
+			.validLogicalAddresses = validLogicalAddresses,
+		});
 	}
 
 	_promiscuous = promiscuous;
 	_monitorMode = monitorMode;
 	_physicalAddress = physicalAddress & 0xffff;
-	_logicalAddress = -1;
 
 	// <Polling Message> to allocate a logical address when physical address is valid
-	if (_validLogicalAddresses && _physicalAddress != 0xffff)
-		Transmit(*_validLogicalAddresses, *_validLogicalAddresses, NULL, 0);
+	if (_physicalAddress == 0xffff) return;
+	for (auto &info : _logicalAddresses) {
+		if (info.validLogicalAddresses) {
+			Transmit(*info.validLogicalAddresses, *info.validLogicalAddresses, NULL, 0);
+			return;
+		}
+	}
 }
 
 ///
@@ -174,7 +190,7 @@ void CEC_Device::Run()
 				int address = _receiveBuffer[0] & 0x0f;
 				if (address == 0x0f)
 					_broadcast = true;
-				else if (address == _logicalAddress)
+				else if ((1 << address) & _logicalAddressMask)
 					_follower = true;
 
 				// Go low for ack/nak
@@ -288,11 +304,22 @@ void CEC_Device::Run()
 			if (_transmitBufferBytes == 1)
 				_transmitBufferBytes = 0;
 
-			if (_logicalAddress < 0) {
+			bool claimed = false;
+			bool polled = false;
+			for (auto &info : _logicalAddresses) {
+				if (info.logicalAddress >= 0) continue;
+				if (claimed) {
+					// Poll next
+					Transmit(*info.validLogicalAddresses, *info.validLogicalAddresses, NULL, 0);
+					polled = true;
+					break;
+				}
 				// Claim this as our logical address
-				_logicalAddress = *_validLogicalAddresses;
-				OnReady(_logicalAddress);
+				info.logicalAddress = *info.validLogicalAddresses;
+				_logicalAddressMask |= (1 << info.logicalAddress);
+				claimed = true;
 			}
+			if (claimed && !polled) OnReady(LogicalAddress());
 
 			_state = CEC_IDLE;
 			break;
@@ -302,16 +329,29 @@ void CEC_Device::Run()
 			_transmitBufferBytes = 0;
 			OnTransmitComplete(_transmitBuffer, _transmitBufferBitIdx >> 3, true);
 
-			if (_logicalAddress < 0) {
+			bool claimed = false;
+			bool polled = false;
+			for (auto &info : _logicalAddresses) {
+				if (info.logicalAddress >= 0) continue;
+				if (claimed) {
+					// Poll next
+					Transmit(*info.validLogicalAddresses, *info.validLogicalAddresses, NULL, 0);
+					polled = true;
+					break;
+				}
 				// Someone is there, try to allocate the next possible logical address
-				if (*++_validLogicalAddresses != CLA_UNREGISTERED) {
-					Transmit(*_validLogicalAddresses, *_validLogicalAddresses, NULL, 0);
+				if (*++info.validLogicalAddresses != CLA_UNREGISTERED) {
+					Transmit(*info.validLogicalAddresses, *info.validLogicalAddresses, NULL, 0);
+					polled = true;
+					break;
 				} else {
 					// No other logical address, use CLA_UNREGISTERED
-					_logicalAddress = CLA_UNREGISTERED;
-					OnReady(_logicalAddress);
+					info.logicalAddress = CLA_UNREGISTERED;
+					_logicalAddressMask |= (1 << info.logicalAddress);
+					claimed = true;
 				}
 			}
+			if (claimed && !polled) OnReady(LogicalAddress());
 
 			_state = CEC_IDLE;
 			break;
@@ -351,8 +391,8 @@ bool CEC_Device::Transmit(int sourceAddress, int targetAddress, const unsigned c
 
 bool CEC_Device::TransmitFrame(int targetAddress, const unsigned char* buffer, int count)
 {
-	if (_logicalAddress < 0)
+	if (LogicalAddress() < 0)
 		return false;
 
-	return Transmit(_logicalAddress, targetAddress, buffer, count);
+	return Transmit(LogicalAddress(), targetAddress, buffer, count);
 }
